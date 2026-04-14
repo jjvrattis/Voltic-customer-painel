@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(ls /c/Users/joaov/Downloads/Voltic/Clientes/voltic-painel/web/.env*)",
+      "Bash(kill -9 18704)",
+      "Bash(curl -s http://localhost:3000/api/v1/auth/ml/url)",
+      "Bash(cmd.exe /c \"FOR /F \\\\\"tokens=5\\\\\" %P IN \\('netstat -ano ^| findstr :3000 ^| findstr LISTENING'\\) DO taskkill /F /PID %P\")"
+    ]
+  }
+}
