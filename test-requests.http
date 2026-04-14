@@ -1,0 +1,99 @@
+### Voltic API — REST Client Test Requests
+### Variáveis: ajuste @baseUrl e @sellerId conforme ambiente
+
+@baseUrl = http://localhost:3000/api/v1
+@mlSellerId = 123456789
+@shopeeSellerId = 987654321
+@orderId = 00000000-0000-0000-0000-000000000001
+@collectorId = 00000000-0000-0000-0000-000000000002
+
+# ────────────────────────────────────────────────────────────
+# HEALTH
+# ────────────────────────────────────────────────────────────
+
+### Health check
+GET {{baseUrl}}/health
+
+# ────────────────────────────────────────────────────────────
+# AUTH — MERCADO LIVRE
+# ────────────────────────────────────────────────────────────
+
+### 1. Gerar URL de autorização ML
+GET {{baseUrl}}/auth/ml/url
+
+###
+
+### 2. Callback ML (simulado — normalmente chamado pelo redirect do ML)
+# Substitua o valor de 'code' pelo code real recebido no redirect
+GET {{baseUrl}}/auth/ml/callback?code=TG-XXXXXXXXXXXXXXXX-123456789
+
+###
+
+### 3. Renovar token ML
+POST {{baseUrl}}/auth/ml/refresh
+Content-Type: application/json
+
+{
+  "sellerId": "{{mlSellerId}}"
+}
+
+# ────────────────────────────────────────────────────────────
+# AUTH — SHOPEE
+# ────────────────────────────────────────────────────────────
+
+### 4. Gerar URL de autorização Shopee
+GET {{baseUrl}}/auth/shopee/url
+
+###
+
+### 5. Callback Shopee (simulado — normalmente chamado pelo redirect da Shopee)
+# Substitua code e shop_id pelos valores reais
+GET {{baseUrl}}/auth/shopee/callback?code=SHOPEE_CODE_HERE&shop_id={{shopeeSellerId}}
+
+# ────────────────────────────────────────────────────────────
+# SYNC — MERCADO LIVRE
+# ────────────────────────────────────────────────────────────
+
+### 6. Sincronizar pedidos ML (ready_to_ship)
+POST {{baseUrl}}/sync/ml/{{mlSellerId}}
+
+# ────────────────────────────────────────────────────────────
+# SYNC — SHOPEE
+# ────────────────────────────────────────────────────────────
+
+### 7. Sincronizar pedidos Shopee (READY_TO_SHIP)
+POST {{baseUrl}}/sync/shopee/{{shopeeSellerId}}
+
+# ────────────────────────────────────────────────────────────
+# ORDERS
+# ────────────────────────────────────────────────────────────
+
+### 8. Listar todos os pedidos (sem filtros)
+GET {{baseUrl}}/orders
+
+###
+
+### 9. Listar pedidos com filtro de status
+GET {{baseUrl}}/orders?status=ready_to_ship
+
+###
+
+### 10. Listar pedidos com múltiplos filtros + paginação
+GET {{baseUrl}}/orders?status=ready_to_ship&platform=mercadolivre&polo=Centro&page=1&limit=10
+
+###
+
+### 11. Listar pedidos Shopee
+GET {{baseUrl}}/orders?platform=shopee&page=1&limit=20
+
+###
+
+### 12. Marcar pedido como coletado
+PATCH {{baseUrl}}/orders/{{orderId}}/collect
+Content-Type: application/json
+
+{
+  "collectedAt": "2026-04-13T18:00:00.000Z",
+  "collectorId": "{{collectorId}}",
+  "trackingScanned": true
+}
