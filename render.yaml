@@ -29,4 +29,14 @@ services:
         sync: false
       - key: SHOPEE_REDIRECT_URI
         sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: ABACATEPAY_API_KEY
+        sync: false
+      - key: ABACATEPAY_WEBHOOK_SECRET
+        sync: false
+      - key: PRICE_ML_CENTS
+        value: "1150"
+      - key: PRICE_SHOPEE_CENTS
+        value: "800"
     healthCheckPath: /api/v1/health
