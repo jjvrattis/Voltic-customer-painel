@@ -82,6 +82,51 @@ export function saveSellerToken(token: string): void {
   if (typeof window !== 'undefined') localStorage.setItem('seller_token', token);
 }
 
+export function getSellerId(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('seller_id');
+}
+
+export function saveSellerId(id: string): void {
+  if (typeof window !== 'undefined') localStorage.setItem('seller_id', id);
+}
+
+export function logoutSeller(): void {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('seller_token');
+    localStorage.removeItem('seller_id');
+  }
+}
+
+export async function loginSeller(
+  email: string,
+  password: string,
+): Promise<{ token: string; seller_id: string }> {
+  const res = await fetch(`${API_BASE}/api/v1/auth/seller/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  const json = (await res.json()) as { success: boolean; data?: { token: string; seller_id: string }; error?: string };
+  if (!json.success || !json.data) throw new Error(json.error ?? `Erro ${res.status}`);
+  return json.data;
+}
+
+export async function registerSeller(
+  invite_token: string,
+  email: string,
+  password: string,
+): Promise<{ token: string; seller_id: string }> {
+  const res = await fetch(`${API_BASE}/api/v1/auth/seller/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ invite_token, email, password }),
+  });
+  const json = (await res.json()) as { success: boolean; data?: { token: string; seller_id: string }; error?: string };
+  if (!json.success || !json.data) throw new Error(json.error ?? `Erro ${res.status}`);
+  return json.data;
+}
+
 async function sellerFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = getSellerToken();
   const res = await fetch(`${API_BASE}/api/v1/seller${path}`, {

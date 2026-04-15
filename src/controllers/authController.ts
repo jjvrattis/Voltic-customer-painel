@@ -1,9 +1,120 @@
 import { Request, Response, NextFunction } from 'express';
+import bcrypt from 'bcryptjs';
 import { buildMLAuthUrl, exchangeMLCode, refreshMLToken } from '../services/mlService';
 import { buildShopeeAuthUrl, exchangeShopeeCode } from '../services/shopeeService';
 import { markInviteConnected, notifyAdminWhatsApp } from '../services/onboardingService';
 import { AppError } from '../middlewares/errorHandler';
 import { ApiResponse } from '../types';
+import { supabase } from '../lib/supabase';
+
+// ── Seller Auth ──────────────────────────────────────────────────────────────
+
+export async function sellerRegister(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { invite_token, email, password } = req.body as {
+      invite_token?: string;
+      email?: string;
+      password?: string;
+    };
+
+    if (!invite_token || !email || !password) {
+      throw new AppError(400, 'invite_token, email e senha são obrigatórios');
+    }
+    if (password.length < 6) {
+      throw new AppError(400, 'Senha deve ter ao menos 6 caracteres');
+    }
+
+    // Valida o invite
+    const { data: invite, error: inviteErr } = await supabase
+      .from('onboarding_invites')
+      .select('seller_id, status')
+      .eq('token', invite_token)
+      .eq('status', 'connected')
+      .single();
+
+    if (inviteErr || !invite) {
+      throw new AppError(401, 'Convite inválido ou seller não conectado');
+    }
+
+    // Verifica se email já existe
+    const { data: existing } = await supabase
+      .from('seller_accounts')
+      .select('id')
+      .eq('email', email.toLowerCase())
+      .single();
+
+    if (existing) throw new AppError(409, 'E-mail já cadastrado');
+
+    const password_hash = await bcrypt.hash(password, 10);
+
+    const { error: insertErr } = await supabase.from('seller_accounts').insert({
+      seller_id: invite.seller_id,
+      email: email.toLowerCase(),
+      password_hash,
+    });
+
+    if (insertErr) throw new AppError(500, `Erro ao criar conta: ${insertErr.message}`);
+
+    const body: ApiResponse<{ token: string; seller_id: string }> = {
+      success: true,
+      data: { token: invite_token, seller_id: invite.seller_id },
+    };
+    res.status(201).json(body);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function sellerLogin(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { email, password } = req.body as { email?: string; password?: string };
+
+    if (!email || !password) {
+      throw new AppError(400, 'E-mail e senha são obrigatórios');
+    }
+
+    const { data: account, error } = await supabase
+      .from('seller_accounts')
+      .select('seller_id, password_hash')
+      .eq('email', email.toLowerCase())
+      .single();
+
+    if (error || !account) throw new AppError(401, 'E-mail ou senha inválidos');
+
+    const valid = await bcrypt.compare(password, account.password_hash);
+    if (!valid) throw new AppError(401, 'E-mail ou senha inválidos');
+
+    // Busca o token de acesso mais recente do seller
+    const { data: invite, error: tokenErr } = await supabase
+      .from('onboarding_invites')
+      .select('token')
+      .eq('seller_id', account.seller_id)
+      .eq('status', 'connected')
+      .order('connected_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (tokenErr || !invite) {
+      throw new AppError(401, 'Seller não possui conexão ativa');
+    }
+
+    const body: ApiResponse<{ token: string; seller_id: string }> = {
+      success: true,
+      data: { token: invite.token, seller_id: account.seller_id },
+    };
+    res.json(body);
+  } catch (err) {
+    next(err);
+  }
+}
 
 // ── Mercado Livre ────────────────────────────────────────────────────────────
 
