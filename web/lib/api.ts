@@ -58,6 +58,32 @@ interface ApiResponse<T> {
 const API_BASE =
   process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
 
+// ─── Admin Auth ───────────────────────────────────────────────────────────────
+
+export function getAdminToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('admin_token');
+}
+
+export function saveAdminToken(token: string): void {
+  if (typeof window !== 'undefined') localStorage.setItem('admin_token', token);
+}
+
+export function logoutAdmin(): void {
+  if (typeof window !== 'undefined') localStorage.removeItem('admin_token');
+}
+
+export async function loginAdmin(email: string, password: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/api/v1/auth/admin/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  const json = (await res.json()) as ApiResponse<{ token: string }>;
+  if (!json.success || !json.data) throw new Error(json.error ?? `Erro ${res.status}`);
+  return json.data.token;
+}
+
 async function apiFetch<T>(
   path: string,
   options?: RequestInit,
