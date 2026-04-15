@@ -13,7 +13,9 @@ export function middleware(request: NextRequest) {
 
     // só reescreve se tiver um ID na URL (ex: /123 ou /123/dashboard)
     if (!pathname.startsWith('/seller') && !isAdminPath && pathname !== '/') {
-      return NextResponse.rewrite(new URL(`/seller${pathname}`, request.url));
+      const rewriteUrl = new URL(`/seller${pathname}`, request.url);
+      rewriteUrl.search = request.nextUrl.search; // preserva query params (?invite=TOKEN)
+      return NextResponse.rewrite(rewriteUrl);
     }
   }
 
