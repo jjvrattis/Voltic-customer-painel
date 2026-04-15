@@ -102,6 +102,21 @@ async function apiFetch<T>(
   return json.data as T;
 }
 
+// ─── Onboarding ───────────────────────────────────────────────────────────────
+
+export interface Invite {
+  token: string;
+  link: string;
+  expires_at: string;
+}
+
+export async function createInvite(sellerName: string, sellerPhone?: string): Promise<Invite> {
+  return apiFetch<Invite>('/onboarding/invite', {
+    method: 'POST',
+    body: JSON.stringify({ sellerName, sellerPhone }),
+  });
+}
+
 // ─── Pedidos ──────────────────────────────────────────────────────────────────
 
 export async function getOrders(
