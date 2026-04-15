@@ -3,29 +3,109 @@
 import { useEffect, useState, useCallback } from 'react';
 import { getDashboard, DashboardData } from '../../../../lib/sellerApi';
 
-const STATUS_LABELS: Record<string, string> = {
-  ready_to_ship: 'Pronto p/ envio',
-  collected:     'Coletado',
-  shipped:       'Enviado',
-  delivered:     'Entregue',
-  cancelled:     'Cancelado',
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  ready_to_ship: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  collected:     'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-  shipped:       'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  delivered:     'bg-[#00FF87]/10 text-[#00FF87] border-[#00FF87]/20',
-  cancelled:     'bg-red-500/10 text-red-400 border-red-500/20',
+// ─── Status config ────────────────────────────────────────────────────
+const STATUS_CONFIG: Record<string, {
+  label: string;
+  color: string;
+  bg: string;
+  border: string;
+  dot: string;
+}> = {
+  ready_to_ship: {
+    label: 'Pronto p/ envio',
+    color: '#FFD700',
+    bg:    'rgba(255,215,0,0.07)',
+    border:'rgba(255,215,0,0.2)',
+    dot:   '#FFD700',
+  },
+  collected: {
+    label: 'Coletado',
+    color: '#C084FC',
+    bg:    'rgba(147,51,234,0.08)',
+    border:'rgba(147,51,234,0.22)',
+    dot:   '#9333EA',
+  },
+  shipped: {
+    label: 'Enviado',
+    color: '#93C5FD',
+    bg:    'rgba(59,130,246,0.08)',
+    border:'rgba(59,130,246,0.2)',
+    dot:   '#3B82F6',
+  },
+  delivered: {
+    label: 'Entregue',
+    color: '#86EFAC',
+    bg:    'rgba(34,197,94,0.07)',
+    border:'rgba(34,197,94,0.18)',
+    dot:   '#22C55E',
+  },
+  cancelled: {
+    label: 'Cancelado',
+    color: '#FCA5A5',
+    bg:    'rgba(239,68,68,0.07)',
+    border:'rgba(239,68,68,0.18)',
+    dot:   '#EF4444',
+  },
 };
 
 function formatCurrency(cents: number) {
   return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-export default function DashboardPage() {
-  const [data, setData]     = useState<DashboardData | null>(null);
-  const [error, setError]   = useState<string | null>(null);
+// ─── StatCard ─────────────────────────────────────────────────────────
+function StatCard({
+  label,
+  value,
+  color,
+  bg,
+  border,
+  dot,
+}: {
+  label: string;
+  value: number;
+  color: string;
+  bg: string;
+  border: string;
+  dot: string;
+}) {
+  return (
+    <div
+      className="rounded-2xl p-4 flex flex-col gap-2 transition-all duration-300"
+      style={{
+        background: bg,
+        border: `1px solid ${border}`,
+        boxShadow: `0 2px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)`,
+      }}
+    >
+      <div className="flex items-center justify-between">
+        <span
+          className="text-[10px] font-semibold uppercase tracking-widest font-body"
+          style={{ color: 'rgba(255,255,255,0.3)' }}
+        >
+          {label}
+        </span>
+        <span
+          className="w-1.5 h-1.5 rounded-full shrink-0"
+          style={{ background: dot, boxShadow: `0 0 6px ${dot}` }}
+        />
+      </div>
+      <span
+        className="text-4xl font-bold leading-none"
+        style={{
+          fontFamily: 'var(--font-rajdhani), system-ui',
+          color,
+          textShadow: `0 0 20px ${color}44`,
+        }}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
+
+export default function SellerDashboardPage() {
+  const [data,    setData]    = useState<DashboardData | null>(null);
+  const [error,   setError]   = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -48,8 +128,14 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-6 h-6 border-2 border-[#00FF87] border-t-transparent rounded-full animate-spin" />
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <div
+          className="w-8 h-8 rounded-full border-2 animate-spin"
+          style={{ borderColor: 'rgba(255,215,0,0.2)', borderTopColor: '#FFD700' }}
+        />
+        <p className="text-xs font-body" style={{ color: 'rgba(255,255,255,0.2)' }}>
+          Carregando...
+        </p>
       </div>
     );
   }
@@ -57,7 +143,14 @@ export default function DashboardPage() {
   if (error) {
     return (
       <div className="p-4">
-        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-sm text-red-400">
+        <div
+          className="rounded-2xl p-4 text-sm font-body"
+          style={{
+            background: 'rgba(239,68,68,0.08)',
+            border: '1px solid rgba(239,68,68,0.2)',
+            color: '#FCA5A5',
+          }}
+        >
           {error}
         </div>
       </div>
@@ -65,98 +158,202 @@ export default function DashboardPage() {
   }
 
   const { orders_today, credit } = data!;
-
   const statuses = ['ready_to_ship', 'collected', 'shipped', 'delivered', 'cancelled'] as const;
 
-  return (
-    <div className="p-4 space-y-4">
+  const pct = Math.max(2, credit.pct_remaining);
+  const isLow = credit.low_credit;
 
-      {/* Hoje */}
+  return (
+    <div className="p-4 space-y-5 animate-fade-in">
+
+      {/* ── Section: Hoje ──────────────────────────── */}
       <section>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide">Hoje</h2>
-          <span className="text-xs text-zinc-600">{orders_today.total} pedidos</span>
+          <div className="flex items-center gap-2">
+            <div
+              className="w-1 h-4 rounded-full"
+              style={{ background: 'linear-gradient(180deg, #9333EA, #FFD700)' }}
+            />
+            <h2
+              className="text-sm font-bold tracking-wide"
+              style={{ fontFamily: 'var(--font-rajdhani), system-ui', color: 'rgba(255,255,255,0.7)' }}
+            >
+              Hoje
+            </h2>
+          </div>
+          <span
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold font-body"
+            style={{
+              background: 'rgba(255,215,0,0.08)',
+              border: '1px solid rgba(255,215,0,0.18)',
+              color: '#FFD700',
+            }}
+          >
+            {orders_today.total} pedidos
+          </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          {statuses.map((s) => (
-            <div
-              key={s}
-              className={`rounded-xl border p-3 flex flex-col gap-1 ${STATUS_COLORS[s]}`}
-            >
-              <span className="text-2xl font-bold">{orders_today[s]}</span>
-              <span className="text-xs opacity-80">{STATUS_LABELS[s]}</span>
-            </div>
-          ))}
+        <div
+          className="grid grid-cols-2 gap-2.5"
+          style={{ isolation: 'isolate' }}
+        >
+          {statuses.map(s => {
+            const cfg = STATUS_CONFIG[s];
+            return (
+              <StatCard
+                key={s}
+                label={cfg.label}
+                value={orders_today[s] as number}
+                color={cfg.color}
+                bg={cfg.bg}
+                border={cfg.border}
+                dot={cfg.dot}
+              />
+            );
+          })}
 
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-3 flex flex-col gap-1">
-            <span className="text-2xl font-bold text-white">{orders_today.total}</span>
-            <span className="text-xs text-zinc-500">Total</span>
+          {/* Total card — spans 2 cols */}
+          <div
+            className="col-span-2 rounded-2xl p-4 flex items-center justify-between transition-all duration-300"
+            style={{
+              background: 'rgba(255,255,255,0.025)',
+              border: '1px solid rgba(147,51,234,0.15)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+            }}
+          >
+            <span
+              className="text-[10px] font-semibold uppercase tracking-widest font-body"
+              style={{ color: 'rgba(255,255,255,0.3)' }}
+            >
+              Total do dia
+            </span>
+            <span
+              className="text-4xl font-bold"
+              style={{ fontFamily: 'var(--font-rajdhani), system-ui', color: '#fff' }}
+            >
+              {orders_today.total}
+            </span>
           </div>
         </div>
       </section>
 
-      {/* Crédito */}
+      {/* ── Section: Crédito ───────────────────────── */}
       <section>
-        <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wide mb-3">
-          Crédito do ciclo
-        </h2>
+        <div className="flex items-center gap-2 mb-3">
+          <div
+            className="w-1 h-4 rounded-full"
+            style={{ background: isLow ? 'linear-gradient(180deg, #EF4444, #F97316)' : 'linear-gradient(180deg, #9333EA, #FFD700)' }}
+          />
+          <h2
+            className="text-sm font-bold tracking-wide"
+            style={{ fontFamily: 'var(--font-rajdhani), system-ui', color: 'rgba(255,255,255,0.7)' }}
+          >
+            Crédito do ciclo
+          </h2>
+        </div>
 
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-4">
-          {/* Barra de progresso */}
+        <div
+          className="rounded-2xl p-4 space-y-4"
+          style={{
+            background: 'rgba(255,255,255,0.025)',
+            border: `1px solid ${isLow ? 'rgba(239,68,68,0.2)' : 'rgba(147,51,234,0.15)'}`,
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+          }}
+        >
+          {/* Progress bar */}
           <div>
-            <div className="flex justify-between text-xs mb-2">
-              <span className="text-zinc-400">Utilizado</span>
-              <span className={credit.low_credit ? 'text-red-400' : 'text-[#00FF87]'}>
+            <div className="flex items-center justify-between text-[11px] mb-2">
+              <span className="font-body" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                Utilizado
+              </span>
+              <span
+                className="font-semibold font-body"
+                style={{ color: isLow ? '#F87171' : '#FFD700' }}
+              >
                 {credit.pct_remaining}% restante
               </span>
             </div>
-            <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+            <div
+              className="h-2 rounded-full overflow-hidden"
+              style={{ background: 'rgba(255,255,255,0.06)' }}
+            >
               <div
-                className={`h-full rounded-full transition-all ${
-                  credit.low_credit ? 'bg-red-500' : 'bg-[#00FF87]'
-                }`}
-                style={{ width: `${Math.max(2, credit.pct_remaining)}%` }}
+                className="h-full rounded-full transition-all duration-700"
+                style={{
+                  width: `${pct}%`,
+                  background: isLow
+                    ? 'linear-gradient(90deg, #EF4444, #F97316)'
+                    : 'linear-gradient(90deg, #9333EA, #FFD700)',
+                  boxShadow: isLow
+                    ? '0 0 8px rgba(239,68,68,0.5)'
+                    : '0 0 8px rgba(255,215,0,0.4)',
+                }}
               />
             </div>
           </div>
 
-          {/* Valores */}
+          {/* Values */}
           <div className="grid grid-cols-3 gap-2 text-center">
-            <div>
-              <p className="text-lg font-bold text-white">{credit.limit}</p>
-              <p className="text-xs text-zinc-500">Limite</p>
-            </div>
-            <div>
-              <p className="text-lg font-bold text-white">{credit.used}</p>
-              <p className="text-xs text-zinc-500">Usados</p>
-            </div>
-            <div>
-              <p className={`text-lg font-bold ${credit.low_credit ? 'text-red-400' : 'text-[#00FF87]'}`}>
-                {credit.remaining}
-              </p>
-              <p className="text-xs text-zinc-500">Restam</p>
-            </div>
+            {[
+              { label: 'Limite',  value: credit.limit,     accent: false },
+              { label: 'Usados',  value: credit.used,      accent: false },
+              { label: 'Restam',  value: credit.remaining, accent: true  },
+            ].map(({ label, value, accent }) => (
+              <div
+                key={label}
+                className="rounded-xl p-2.5"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
+              >
+                <p
+                  className="text-lg font-bold leading-tight"
+                  style={{
+                    fontFamily: 'var(--font-rajdhani), system-ui',
+                    color: accent ? (isLow ? '#F87171' : '#FFD700') : '#fff',
+                  }}
+                >
+                  {value}
+                </p>
+                <p className="text-[10px] font-body mt-0.5" style={{ color: 'rgba(255,255,255,0.25)' }}>
+                  {label}
+                </p>
+              </div>
+            ))}
           </div>
 
-          {/* Ciclo */}
-          <div className="text-center text-xs text-zinc-600 border-t border-zinc-800 pt-3">
-            Ciclo: {new Date(credit.cycle_start + 'T00:00:00').toLocaleDateString('pt-BR')} →{' '}
+          {/* Cycle dates */}
+          <div
+            className="text-center text-[10px] font-body pt-1"
+            style={{
+              borderTop: '1px solid rgba(255,255,255,0.05)',
+              color: 'rgba(255,255,255,0.2)',
+            }}
+          >
+            Ciclo:{' '}
+            {new Date(credit.cycle_start + 'T00:00:00').toLocaleDateString('pt-BR')}
+            {' → '}
             {new Date(credit.cycle_end + 'T00:00:00').toLocaleDateString('pt-BR')}
           </div>
 
-          {credit.low_credit && (
-            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-xs text-red-400 text-center">
-              Crédito baixo — acesse <strong>Financeiro</strong> para regularizar
+          {/* Low credit warning */}
+          {isLow && (
+            <div
+              className="rounded-xl p-3 text-xs text-center font-body"
+              style={{
+                background: 'rgba(239,68,68,0.08)',
+                border: '1px solid rgba(239,68,68,0.2)',
+                color: '#FCA5A5',
+              }}
+            >
+              ⚠ Crédito baixo — acesse <strong>Financeiro</strong> para regularizar
             </div>
           )}
         </div>
       </section>
 
-      {/* Valor por pedido */}
-      <p className="text-center text-xs text-zinc-600">
-        Custo por pedido: {formatCurrency(Number(process.env.NEXT_PUBLIC_PRICE_PER_ORDER_CENTS ?? 150))}
-      </p>
+
     </div>
   );
 }

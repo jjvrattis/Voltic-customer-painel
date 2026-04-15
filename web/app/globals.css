@@ -5,27 +5,132 @@
 @layer base {
   :root {
     color-scheme: dark;
+
+    /* Voltic brand tokens */
+    --volt-gold:        #FFD700;
+    --volt-purple:      #9333EA;
+    --volt-purple-dim:  #6B21A8;
+    --volt-blue:        #0047AB;
+    --volt-dark:        #0C0A1A;
+    --volt-deeper:      #06040F;
+    --volt-silver:      #D0D5DB;
+
+    /* Glass surface tokens */
+    --glass-bg:         rgba(255, 255, 255, 0.04);
+    --glass-bg-hover:   rgba(255, 255, 255, 0.07);
+    --glass-border:     rgba(147, 51, 234, 0.2);
+    --glass-border-gold:rgba(255, 215, 0, 0.25);
+    --glass-blur:       16px;
   }
 
-  * {
-    box-sizing: border-box;
-  }
+  * { box-sizing: border-box; }
 
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  ::-webkit-scrollbar-track {
-    background: #18181b;
-  }
-
+  ::-webkit-scrollbar       { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb {
-    background: #3f3f46;
+    background: rgba(147, 51, 234, 0.4);
     border-radius: 3px;
   }
-
   ::-webkit-scrollbar-thumb:hover {
-    background: #00FF87;
+    background: rgba(255, 215, 0, 0.5);
   }
+}
+
+@layer components {
+  /* ── Glass card ──────────────────────────────────────────── */
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    box-shadow: 0 4px 32px rgba(0,0,0,0.4),
+                inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+
+  .glass-gold {
+    background: rgba(255, 215, 0, 0.04);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--glass-border-gold);
+    border-radius: 16px;
+    box-shadow: 0 4px 32px rgba(255,215,0,0.08),
+                inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+
+  .glass-sm {
+    background: var(--glass-bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.3),
+                inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  /* ── Volt button ─────────────────────────────────────────── */
+  .btn-volt {
+    @apply inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold
+           transition-all duration-200;
+    background: linear-gradient(135deg, #FFD700 0%, #F59E0B 100%);
+    color: #06040F;
+    box-shadow: 0 2px 16px rgba(255,215,0,0.25);
+  }
+  .btn-volt:hover {
+    box-shadow: 0 4px 24px rgba(255,215,0,0.4);
+    transform: translateY(-1px);
+  }
+  .btn-volt:active { transform: translateY(0); }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium
+           transition-all duration-200;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    color: rgba(255,255,255,0.7);
+  }
+  .btn-ghost:hover {
+    background: var(--glass-bg-hover);
+    border-color: rgba(147,51,234,0.4);
+    color: #fff;
+  }
+
+  /* ── Badge ─────────────────────────────────────────────────*/
+  .badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold;
+  }
+}
+
+@layer utilities {
+  /* Ambient glow backgrounds */
+  .bg-volt-ambient {
+    background:
+      radial-gradient(ellipse 70% 50% at 50% -5%, rgba(147,51,234,0.2) 0%, transparent 65%),
+      radial-gradient(ellipse 40% 30% at 85% 80%, rgba(255,215,0,0.06) 0%, transparent 60%),
+      #06040F;
+  }
+
+  .text-brand { color: var(--volt-gold); }
+  .text-volt-purple { color: var(--volt-purple); }
+
+  .border-glass  { border-color: var(--glass-border); }
+  .border-glass-gold { border-color: var(--glass-border-gold); }
+
+  .animate-slide-up { animation: slideUp 0.3s ease-out; }
+  .animate-fade-in  { animation: fadeIn 0.25s ease-out; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(255,215,0,0.3); }
+  50%       { box-shadow: 0 0 40px rgba(255,215,0,0.6); }
 }

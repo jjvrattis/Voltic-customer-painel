@@ -1,69 +1,122 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { getPedidos, SellerOrder, OrderStatus } from '../../../../lib/sellerApi';
+import { getPedidos, SellerOrder } from '../../../../lib/sellerApi';
 
-const STATUS_LABELS: Record<string, string> = {
-  pending:       'Pendente',
-  ready_to_ship: 'Pronto p/ envio',
-  collected:     'Coletado',
-  shipped:       'Enviado',
-  delivered:     'Entregue',
-  cancelled:     'Cancelado',
+const STATUS_CONFIG: Record<string, {
+  label: string;
+  color: string;
+  bg: string;
+  border: string;
+  dot: string;
+}> = {
+  pending:       { label: 'Pendente',        color: 'rgba(255,255,255,0.4)', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.1)', dot: 'rgba(255,255,255,0.3)' },
+  ready_to_ship: { label: 'Pronto p/ envio', color: '#FFD700',               bg: 'rgba(255,215,0,0.07)',   border: 'rgba(255,215,0,0.2)',   dot: '#FFD700' },
+  collected:     { label: 'Coletado',        color: '#C084FC',               bg: 'rgba(147,51,234,0.08)', border: 'rgba(147,51,234,0.22)', dot: '#9333EA' },
+  shipped:       { label: 'Enviado',         color: '#93C5FD',               bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.2)',  dot: '#3B82F6' },
+  delivered:     { label: 'Entregue',        color: '#86EFAC',               bg: 'rgba(34,197,94,0.07)',  border: 'rgba(34,197,94,0.18)',  dot: '#22C55E' },
+  cancelled:     { label: 'Cancelado',       color: '#FCA5A5',               bg: 'rgba(239,68,68,0.07)',  border: 'rgba(239,68,68,0.18)', dot: '#EF4444' },
 };
 
-const STATUS_DOT: Record<string, string> = {
-  pending:       'bg-zinc-500',
-  ready_to_ship: 'bg-blue-400',
-  collected:     'bg-yellow-400',
-  shipped:       'bg-purple-400',
-  delivered:     'bg-[#00FF87]',
-  cancelled:     'bg-red-400',
-};
-
-const FILTER_OPTIONS: Array<{ value: string; label: string }> = [
+const FILTER_OPTIONS = [
   { value: '',              label: 'Todos' },
-  { value: 'ready_to_ship', label: 'Pronto' },
-  { value: 'collected',     label: 'Coletado' },
-  { value: 'shipped',       label: 'Enviado' },
-  { value: 'delivered',     label: 'Entregue' },
-  { value: 'cancelled',     label: 'Cancelado' },
+  { value: 'ready_to_ship', label: 'Prontos' },
+  { value: 'collected',     label: 'Coletados' },
+  { value: 'shipped',       label: 'Enviados' },
+  { value: 'delivered',     label: 'Entregues' },
+  { value: 'cancelled',     label: 'Cancelados' },
 ];
 
-function OrderCard({ order }: { order: SellerOrder }) {
+function PlatformBadge({ platform }: { platform: string }) {
+  const isML = platform === 'mercadolivre';
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-2">
+    <span
+      className="text-[9px] font-bold tracking-wide font-body"
+      style={{ color: isML ? 'rgba(252,211,77,0.6)' : 'rgba(251,146,60,0.6)' }}
+    >
+      {isML ? 'ML' : 'SHOPEE'}
+    </span>
+  );
+}
+
+function OrderCard({ order }: { order: SellerOrder }) {
+  const cfg = STATUS_CONFIG[order.status] ?? STATUS_CONFIG['pending'];
+
+  return (
+    <div
+      className="rounded-2xl p-4 space-y-3 transition-all duration-200 active:scale-[0.99]"
+      style={{
+        background: 'rgba(255,255,255,0.025)',
+        border: '1px solid rgba(147,51,234,0.14)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        boxShadow: '0 2px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+      }}
+    >
+      {/* Top row */}
       <div className="flex items-center justify-between">
-        <span className="text-xs text-zinc-500 font-mono">#{order.external_order_id}</span>
-        <span className="flex items-center gap-1.5 text-xs">
-          <span className={`w-2 h-2 rounded-full ${STATUS_DOT[order.status]}`} />
-          <span className="text-zinc-300">{STATUS_LABELS[order.status]}</span>
+        <code
+          className="text-xs font-mono"
+          style={{ color: 'rgba(255,255,255,0.45)' }}
+        >
+          #{order.external_order_id}
+        </code>
+
+        <span
+          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold font-body"
+          style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color }}
+        >
+          <span
+            className="w-1.5 h-1.5 rounded-full shrink-0"
+            style={{ background: cfg.dot, boxShadow: `0 0 4px ${cfg.dot}` }}
+          />
+          {cfg.label}
         </span>
       </div>
 
+      {/* Tracking */}
       {order.tracking_number && (
-        <div className="flex items-center gap-2 text-xs text-zinc-500">
-          <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <div className="flex items-center gap-2">
+          <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: 'rgba(255,255,255,0.2)' }}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25" />
           </svg>
-          <span className="font-mono truncate">{order.tracking_number}</span>
+          <code
+            className="text-xs font-mono truncate"
+            style={{ color: 'rgba(255,255,255,0.3)' }}
+          >
+            {order.tracking_number}
+          </code>
         </div>
       )}
 
+      {/* Address */}
       {order.pickup_address && (
-        <p className="text-xs text-zinc-500 truncate">{order.pickup_address}</p>
+        <div className="flex items-start gap-2">
+          <svg className="w-3.5 h-3.5 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} style={{ color: 'rgba(255,255,255,0.2)' }}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+          </svg>
+          <p
+            className="text-xs font-body truncate"
+            style={{ color: 'rgba(255,255,255,0.25)' }}
+          >
+            {order.pickup_address}
+          </p>
+        </div>
       )}
 
-      <div className="flex items-center justify-between pt-1">
-        <span className="text-[10px] text-zinc-600">
-          {order.platform === 'mercadolivre' ? 'Mercado Livre' : 'Shopee'}
-        </span>
-        <span className="text-[10px] text-zinc-600">
+      {/* Footer */}
+      <div
+        className="flex items-center justify-between pt-1"
+        style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
+      >
+        <PlatformBadge platform={order.platform} />
+        <span
+          className="text-[10px] font-body"
+          style={{ color: 'rgba(255,255,255,0.18)' }}
+        >
           {new Date(order.created_at).toLocaleDateString('pt-BR', {
-            day: '2-digit',
-            month: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
+            day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
           })}
         </span>
       </div>
@@ -71,13 +124,13 @@ function OrderCard({ order }: { order: SellerOrder }) {
   );
 }
 
-export default function PedidosPage() {
-  const [orders, setOrders] = useState<SellerOrder[]>([]);
-  const [total, setTotal]   = useState(0);
-  const [page, setPage]     = useState(1);
-  const [status, setStatus] = useState<string>('');
+export default function SellerPedidosPage() {
+  const [orders,  setOrders]  = useState<SellerOrder[]>([]);
+  const [total,   setTotal]   = useState(0);
+  const [page,    setPage]    = useState(1);
+  const [status,  setStatus]  = useState('');
   const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState<string | null>(null);
+  const [error,   setError]   = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -92,7 +145,6 @@ export default function PedidosPage() {
     }
   }, [status, page]);
 
-  // Polling a cada 20s
   useEffect(() => {
     setLoading(true);
     void load();
@@ -100,74 +152,114 @@ export default function PedidosPage() {
     return () => clearInterval(id);
   }, [load]);
 
-  // Reset page when filter changes
-  useEffect(() => {
-    setPage(1);
-  }, [status]);
+  useEffect(() => { setPage(1); }, [status]);
+
+  const totalPages = Math.ceil(total / 20);
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-4 space-y-4 animate-fade-in">
 
-      {/* Filtros */}
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
-        {FILTER_OPTIONS.map((opt) => (
-          <button
-            key={opt.value}
-            onClick={() => setStatus(opt.value)}
-            className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-              status === opt.value
-                ? 'bg-[#00FF87] text-black'
-                : 'bg-zinc-900 text-zinc-400 border border-zinc-800 hover:border-zinc-600'
-            }`}
-          >
-            {opt.label}
-          </button>
-        ))}
+      {/* ── Filter pills ────────────────────────────── */}
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-none">
+        {FILTER_OPTIONS.map(opt => {
+          const active = status === opt.value;
+          return (
+            <button
+              key={opt.value}
+              onClick={() => setStatus(opt.value)}
+              className="shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200"
+              style={{
+                fontFamily: 'var(--font-rajdhani), system-ui',
+                letterSpacing: '0.04em',
+                background: active ? 'rgba(255,215,0,0.12)' : 'rgba(255,255,255,0.04)',
+                border: active ? '1px solid rgba(255,215,0,0.3)' : '1px solid rgba(147,51,234,0.15)',
+                color: active ? '#FFD700' : 'rgba(255,255,255,0.35)',
+                boxShadow: active ? '0 0 12px rgba(255,215,0,0.15)' : 'none',
+              }}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
       </div>
 
-      {/* Lista */}
+      {/* Count label */}
+      {!loading && (
+        <p className="text-[11px] font-body" style={{ color: 'rgba(255,255,255,0.2)' }}>
+          {total} pedido{total !== 1 ? 's' : ''} encontrado{total !== 1 ? 's' : ''}
+        </p>
+      )}
+
+      {/* ── List ────────────────────────────────────── */}
       {loading && orders.length === 0 ? (
-        <div className="flex items-center justify-center h-40">
-          <div className="w-6 h-6 border-2 border-[#00FF87] border-t-transparent rounded-full animate-spin" />
+        <div className="flex flex-col items-center justify-center h-40 gap-3">
+          <div
+            className="w-8 h-8 rounded-full border-2 animate-spin"
+            style={{ borderColor: 'rgba(255,215,0,0.2)', borderTopColor: '#FFD700' }}
+          />
+          <p className="text-xs font-body" style={{ color: 'rgba(255,255,255,0.2)' }}>
+            Carregando...
+          </p>
         </div>
       ) : error ? (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-sm text-red-400">
+        <div
+          className="rounded-2xl p-4 text-sm font-body"
+          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#FCA5A5' }}
+        >
           {error}
         </div>
       ) : orders.length === 0 ? (
-        <div className="text-center text-zinc-600 py-12 text-sm">
-          Nenhum pedido encontrado
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <div
+            className="w-14 h-14 rounded-2xl flex items-center justify-center"
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(147,51,234,0.15)' }}
+          >
+            <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} style={{ color: 'rgba(255,255,255,0.15)' }}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6" />
+            </svg>
+          </div>
+          <p className="text-sm font-body" style={{ color: 'rgba(255,255,255,0.2)' }}>
+            Nenhum pedido encontrado
+          </p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {orders.map((o) => <OrderCard key={o.id} order={o} />)}
+        <div className="space-y-2.5">
+          {orders.map(o => <OrderCard key={o.id} order={o} />)}
         </div>
       )}
 
-      {/* Paginação */}
+      {/* ── Pagination ──────────────────────────────── */}
       {total > 20 && (
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex items-center justify-between pt-1">
           <button
             disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-            className="px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-400 disabled:opacity-40"
+            onClick={() => setPage(p => p - 1)}
+            className="px-4 py-2 rounded-xl text-xs font-body transition-all duration-200 disabled:opacity-30"
+            style={{
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(147,51,234,0.2)',
+              color: 'rgba(255,255,255,0.4)',
+            }}
           >
-            Anterior
+            ← Anterior
           </button>
-          <span className="text-xs text-zinc-500">
-            {page} / {Math.ceil(total / 20)}
+          <span className="text-xs font-body" style={{ color: 'rgba(255,255,255,0.2)' }}>
+            {page} / {totalPages}
           </span>
           <button
-            disabled={page >= Math.ceil(total / 20)}
-            onClick={() => setPage((p) => p + 1)}
-            className="px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs text-zinc-400 disabled:opacity-40"
+            disabled={page >= totalPages}
+            onClick={() => setPage(p => p + 1)}
+            className="px-4 py-2 rounded-xl text-xs font-body transition-all duration-200 disabled:opacity-30"
+            style={{
+              background: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(147,51,234,0.2)',
+              color: 'rgba(255,255,255,0.4)',
+            }}
           >
-            Próxima
+            Próxima →
           </button>
         </div>
       )}
-
-      <p className="text-center text-xs text-zinc-700">{total} pedidos no total</p>
     </div>
   );
 }

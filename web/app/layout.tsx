@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Rajdhani } from 'next/font/google';
 import './globals.css';
 
 const inter = Inter({
@@ -8,9 +8,16 @@ const inter = Inter({
   display: 'swap',
 });
 
+const rajdhani = Rajdhani({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-rajdhani',
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
   title: 'Voltic — Painel Operacional',
-  description: 'Painel de operações de last-mile delivery',
+  description: 'Painel de operações de last-mile delivery · São Paulo',
 };
 
 export default function RootLayout({
@@ -21,10 +28,12 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className="dark">
       <body
-        className={`${inter.variable} font-sans bg-zinc-950 text-white min-h-screen antialiased`}
+        className={`${inter.variable} ${rajdhani.variable} font-sans min-h-screen antialiased`}
+        style={{ background: '#06040F', color: '#fff' }}
       >
         {children}
       </body>
     </html>
   );
 }
+
