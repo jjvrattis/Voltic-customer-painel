@@ -1,8 +1,10 @@
 'use client';
 
+import { useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useParams, usePathname } from 'next/navigation';
+import { useParams, usePathname, useRouter } from 'next/navigation';
+import { getSellerToken, logoutSeller } from '../../../lib/sellerApi';
 
 function NavItem({
   href,
@@ -51,7 +53,17 @@ function NavItem({
 export default function SellerLayout({ children }: { children: React.ReactNode }) {
   const params   = useParams<{ id: string }>();
   const pathname = usePathname();
+  const router   = useRouter();
   const base     = `/seller/${params.id}`;
+
+  useEffect(() => {
+    if (!getSellerToken()) router.replace('/login');
+  }, [router]);
+
+  function handleLogout() {
+    logoutSeller();
+    router.replace('/login');
+  }
 
   const nav = [
     {
@@ -121,6 +133,17 @@ export default function SellerLayout({ children }: { children: React.ReactNode }
 
         <div className="flex-1" />
 
+
+        {/* Logout */}
+        <button
+          onClick={handleLogout}
+          className="text-[10px] uppercase tracking-widest font-body px-2 py-1 rounded-lg transition-colors"
+          style={{ color: 'rgba(255,255,255,0.2)', border: '1px solid rgba(255,255,255,0.06)' }}
+          onMouseEnter={e => (e.currentTarget.style.color = '#FCA5A5')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.2)')}
+        >
+          Sair
+        </button>
 
         {/* Pulsing live dot */}
         <div className="flex items-center gap-1.5">

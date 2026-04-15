@@ -5,6 +5,8 @@ import {
   mlRefresh,
   shopeeGetUrl,
   shopeeCallback,
+  sellerRegister,
+  sellerLogin,
 } from '../controllers/authController';
 
 const router = Router();
@@ -13,6 +15,10 @@ const router = Router();
 router.get('/ml/url', mlGetUrl);
 router.get('/ml/callback', mlCallback);
 router.post('/ml/refresh', mlRefresh);
+
+// Seller Auth
+router.post('/seller/register', sellerRegister);
+router.post('/seller/login',    sellerLogin);
 
 // Shopee
 router.get('/shopee/url', shopeeGetUrl);
