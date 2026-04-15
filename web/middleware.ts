@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+// rotas exclusivas do painel admin — não devem ser reescritas no domínio seller
+const ADMIN_PATHS = ['/dashboard', '/pedidos', '/conectar', '/onboarding'];
+
 export function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') ?? '';
   const pathname = request.nextUrl.pathname;
 
-  // seller.expressvoltic.com.br/[id]/... → /seller/[id]/...
   if (hostname.startsWith('seller.')) {
-    // já está no caminho certo, só reescreve adicionando o prefixo /seller
-    if (!pathname.startsWith('/seller')) {
+    const isAdminPath = ADMIN_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'));
+
+    // só reescreve se tiver um ID na URL (ex: /123 ou /123/dashboard)
+    if (!pathname.startsWith('/seller') && !isAdminPath && pathname !== '/') {
       return NextResponse.rewrite(new URL(`/seller${pathname}`, request.url));
     }
   }
