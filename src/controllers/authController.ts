@@ -191,11 +191,8 @@ export async function mlCallback(
     if (inviteToken) {
       await markInviteConnected(inviteToken, token.seller_id);
       await notifyAdminWhatsApp(token.seller_id);
-      // Redireciona para o painel do seller passando o token como query param
-      // O frontend salva o token no localStorage e redireciona internamente
-      res.redirect(
-        `${frontendUrl}/seller/${token.seller_id}?token=${inviteToken}`,
-      );
+      // Redireciona para o cadastro do seller para ele criar email/senha
+      res.redirect(`${frontendUrl}/register?invite=${inviteToken}`);
       return;
     }
 

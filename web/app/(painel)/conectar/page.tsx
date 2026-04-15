@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { getMLAuthUrl, getShopeeAuthUrl, getConnectedSellers, SellerToken } from '@/lib/api';
+import { getMLAuthUrl, getShopeeAuthUrl, getConnectedSellers, createInvite, SellerToken } from '@/lib/api';
 
 // ─── Platform card ────────────────────────────────────────────────────
 function PlatformCard({
@@ -191,6 +191,13 @@ export default function ConectarPage() {
   const [sellersLoading, setSellersLoading] = useState(true);
   const [sellersError,  setSellersError]  = useState<string | null>(null);
 
+  const [inviteName,  setInviteName]  = useState('');
+  const [invitePhone, setInvitePhone] = useState('');
+  const [inviteLink,  setInviteLink]  = useState<string | null>(null);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteError,   setInviteError]   = useState<string | null>(null);
+  const [copied,        setCopied]        = useState(false);
+
   useEffect(() => {
     getConnectedSellers()
       .then(setSellers)
@@ -205,6 +212,27 @@ export default function ConectarPage() {
     setMlLoading(true); setConnectError(null);
     try { window.location.href = await getMLAuthUrl(); }
     catch (err) { setConnectError(err instanceof Error ? err.message : 'Erro ao gerar URL do ML'); setMlLoading(false); }
+  }
+
+  async function handleCreateInvite(e: React.FormEvent) {
+    e.preventDefault();
+    setInviteLoading(true); setInviteError(null); setInviteLink(null); setCopied(false);
+    try {
+      const invite = await createInvite(inviteName, invitePhone || undefined);
+      setInviteLink(invite.link);
+      setInviteName(''); setInvitePhone('');
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : 'Erro ao gerar convite');
+    } finally {
+      setInviteLoading(false);
+    }
+  }
+
+  function handleCopy() {
+    if (!inviteLink) return;
+    void navigator.clipboard.writeText(inviteLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   }
 
   async function handleConnectShopee() {
@@ -265,6 +293,99 @@ export default function ConectarPage() {
           onConnect={() => void handleConnectShopee()}
           loading={shopeeLoading}
         />
+      </div>
+
+      {/* ── Gerar convite ───────────────────────────────────── */}
+      <div className="mb-10">
+        <div className="flex items-center gap-3 mb-4">
+          <h2 className="text-[10px] font-semibold uppercase tracking-[0.18em] font-body" style={{ color: 'rgba(255,255,255,0.3)' }}>
+            Convidar Seller
+          </h2>
+          <div className="flex-1 h-px" style={{ background: 'rgba(147,51,234,0.12)' }} />
+        </div>
+
+        <div
+          className="rounded-2xl p-6"
+          style={{
+            background: 'rgba(255,255,255,0.025)',
+            border: '1px solid rgba(147,51,234,0.15)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+          }}
+        >
+          <form onSubmit={e => void handleCreateInvite(e)} className="flex flex-wrap gap-3 items-end">
+            <div className="flex flex-col gap-1.5 flex-1 min-w-[160px]">
+              <label className="text-[10px] font-semibold uppercase tracking-widest font-body" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                Nome do seller
+              </label>
+              <input
+                type="text"
+                value={inviteName}
+                onChange={e => setInviteName(e.target.value)}
+                required
+                placeholder="Ex: João Silva"
+                className="rounded-xl px-4 py-2.5 text-sm font-body outline-none"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(147,51,234,0.2)', color: '#fff' }}
+                onFocus={e => (e.currentTarget.style.borderColor = 'rgba(147,51,234,0.6)')}
+                onBlur={e => (e.currentTarget.style.borderColor = 'rgba(147,51,234,0.2)')}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5 flex-1 min-w-[160px]">
+              <label className="text-[10px] font-semibold uppercase tracking-widest font-body" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                Telefone (opcional)
+              </label>
+              <input
+                type="text"
+                value={invitePhone}
+                onChange={e => setInvitePhone(e.target.value)}
+                placeholder="11999999999"
+                className="rounded-xl px-4 py-2.5 text-sm font-body outline-none"
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(147,51,234,0.2)', color: '#fff' }}
+                onFocus={e => (e.currentTarget.style.borderColor = 'rgba(147,51,234,0.6)')}
+                onBlur={e => (e.currentTarget.style.borderColor = 'rgba(147,51,234,0.2)')}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={inviteLoading}
+              className="rounded-xl px-5 py-2.5 text-sm font-bold transition-all duration-200"
+              style={{
+                fontFamily: 'var(--font-rajdhani), system-ui',
+                background: inviteLoading ? 'rgba(255,215,0,0.2)' : 'linear-gradient(135deg, #FFD700, #F59E0B)',
+                color: '#0C0A1A',
+                cursor: inviteLoading ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {inviteLoading ? 'Gerando...' : 'Gerar link'}
+            </button>
+          </form>
+
+          {inviteError && (
+            <p className="mt-3 text-xs font-body" style={{ color: '#FCA5A5' }}>{inviteError}</p>
+          )}
+
+          {inviteLink && (
+            <div
+              className="mt-4 flex items-center gap-3 rounded-xl px-4 py-3"
+              style={{ background: 'rgba(255,215,0,0.06)', border: '1px solid rgba(255,215,0,0.2)' }}
+            >
+              <code className="flex-1 text-xs font-mono truncate" style={{ color: '#FFD700' }}>
+                {inviteLink}
+              </code>
+              <button
+                onClick={handleCopy}
+                className="shrink-0 text-[11px] font-bold font-body px-3 py-1.5 rounded-lg transition-all"
+                style={{
+                  background: copied ? 'rgba(34,197,94,0.15)' : 'rgba(255,215,0,0.1)',
+                  border: `1px solid ${copied ? 'rgba(34,197,94,0.3)' : 'rgba(255,215,0,0.2)'}`,
+                  color: copied ? '#86EFAC' : '#FFD700',
+                }}
+              >
+                {copied ? 'Copiado!' : 'Copiar'}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Connected sellers ────────────────────────────────── */}
