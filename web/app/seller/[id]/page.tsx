@@ -11,27 +11,33 @@ function SellerRoot() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    // Salva token se veio no query string (redirect pós-OAuth)
     const token = searchParams.get('token');
     if (token) saveSellerToken(token);
-
     router.replace(`/seller/${params.id}/dashboard`);
   }, [params.id, router, searchParams]);
 
   return (
     <div className="flex items-center justify-center min-h-screen">
-      <div className="w-6 h-6 border-2 border-[#00FF87] border-t-transparent rounded-full animate-spin" />
+      <div
+        className="w-8 h-8 rounded-full border-2 animate-spin"
+        style={{ borderColor: 'rgba(255,215,0,0.2)', borderTopColor: '#FFD700' }}
+      />
     </div>
   );
 }
 
 export default function SellerPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="w-6 h-6 border-2 border-[#00FF87] border-t-transparent rounded-full animate-spin" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-screen">
+          <div
+            className="w-8 h-8 rounded-full border-2 animate-spin"
+            style={{ borderColor: 'rgba(255,215,0,0.2)', borderTopColor: '#FFD700' }}
+          />
+        </div>
+      }
+    >
       <SellerRoot />
     </Suspense>
   );

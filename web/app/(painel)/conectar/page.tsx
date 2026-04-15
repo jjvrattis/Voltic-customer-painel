@@ -2,45 +2,87 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import {
-  getMLAuthUrl,
-  getShopeeAuthUrl,
-  getConnectedSellers,
-  SellerToken,
-} from '@/lib/api';
+import { getMLAuthUrl, getShopeeAuthUrl, getConnectedSellers, SellerToken } from '@/lib/api';
 
-function ConnectButton({
+// ─── Platform card ────────────────────────────────────────────────────
+function PlatformCard({
   label,
   description,
-  color,
-  logo,
   onConnect,
   loading,
+  isML,
 }: {
   label: string;
   description: string;
-  color: string;
-  logo: React.ReactNode;
   onConnect: () => void;
   loading: boolean;
+  isML: boolean;
 }) {
+  const color = isML ? '#FCD34D' : '#FB923C';
+  const bg    = isML ? 'rgba(234,179,8,0.06)' : 'rgba(249,115,22,0.06)';
+  const border = isML ? 'rgba(234,179,8,0.22)' : 'rgba(249,115,22,0.2)';
+  const glow   = isML ? 'rgba(234,179,8,0.12)' : 'rgba(249,115,22,0.08)';
+
   return (
-    <div className={`rounded-xl border ${color} p-6 flex flex-col gap-4`}>
-      <div className="flex items-center gap-3">
-        {logo}
+    <div
+      className="rounded-2xl p-6 flex flex-col gap-5 transition-all duration-300"
+      style={{
+        background: bg,
+        border: `1px solid ${border}`,
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        boxShadow: `0 4px 32px ${glow}, inset 0 1px 0 rgba(255,255,255,0.05)`,
+      }}
+    >
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <div
+          className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0"
+          style={{
+            background: `${color}18`,
+            border: `1px solid ${color}30`,
+            boxShadow: `0 0 16px ${color}22`,
+          }}
+        >
+          <span
+            className="text-lg font-black"
+            style={{ fontFamily: 'var(--font-rajdhani), system-ui', color }}
+          >
+            {isML ? 'ML' : 'SHP'}
+          </span>
+        </div>
         <div>
-          <h3 className="font-semibold text-white">{label}</h3>
-          <p className="text-xs text-zinc-400 mt-0.5">{description}</p>
+          <h3
+            className="font-bold text-white text-base"
+            style={{ fontFamily: 'var(--font-rajdhani), system-ui', letterSpacing: '0.03em' }}
+          >
+            {label}
+          </h3>
+          <p className="text-[11px] font-body mt-0.5" style={{ color: 'rgba(255,255,255,0.3)' }}>
+            {description}
+          </p>
         </div>
       </div>
+
+      {/* Button */}
       <button
         onClick={onConnect}
         disabled={loading}
-        className="w-full py-2.5 rounded-lg text-sm font-semibold bg-white text-zinc-900 hover:bg-zinc-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+        className="w-full py-3 rounded-xl text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        style={{
+          fontFamily: 'var(--font-rajdhani), system-ui',
+          letterSpacing: '0.05em',
+          background: `linear-gradient(135deg, ${color}22 0%, ${color}10 100%)`,
+          border: `1px solid ${color}40`,
+          color,
+        }}
       >
         {loading ? (
           <>
-            <span className="w-4 h-4 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
+            <span
+              className="w-4 h-4 rounded-full border-2 animate-spin"
+              style={{ borderColor: `${color}40`, borderTopColor: color }}
+            />
             Redirecionando...
           </>
         ) : (
@@ -51,79 +93,103 @@ function ConnectButton({
   );
 }
 
+// ─── Seller row ───────────────────────────────────────────────────────
 function SellerRow({ token }: { token: SellerToken }) {
-  const isExpired = new Date(token.expires_at) < new Date();
-  const expiresIn = Math.round(
-    (new Date(token.expires_at).getTime() - Date.now()) / 1000 / 60 / 60,
-  );
+  const isExpired  = new Date(token.expires_at) < new Date();
+  const isML       = token.platform === 'mercadolivre';
+  const expiresIn  = Math.round((new Date(token.expires_at).getTime() - Date.now()) / 1000 / 60 / 60);
 
   return (
-    <tr className="border-b border-zinc-800 hover:bg-zinc-900/50 transition-colors">
-      <td className="px-4 py-3 text-sm font-mono text-zinc-300">
-        {token.seller_id}
+    <tr
+      className="transition-colors duration-150"
+      style={{ borderBottom: '1px solid rgba(147,51,234,0.07)' }}
+    >
+      <td className="px-5 py-3.5">
+        <code className="text-xs font-mono" style={{ color: 'rgba(255,255,255,0.55)' }}>
+          {token.seller_id}
+        </code>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-5 py-3.5">
         <span
-          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${
-            token.platform === 'mercadolivre'
-              ? 'bg-yellow-400/10 text-yellow-400 border-yellow-400/20'
-              : 'bg-orange-400/10 text-orange-400 border-orange-400/20'
-          }`}
+          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide"
+          style={
+            isML
+              ? { background: 'rgba(234,179,8,0.12)', color: '#FCD34D', border: '1px solid rgba(234,179,8,0.2)' }
+              : { background: 'rgba(249,115,22,0.1)', color: '#FB923C', border: '1px solid rgba(249,115,22,0.2)' }
+          }
         >
-          {token.platform === 'mercadolivre' ? 'Mercado Livre' : 'Shopee'}
+          {isML ? 'Mercado Livre' : 'Shopee'}
         </span>
       </td>
-      <td className="px-4 py-3">
+      <td className="px-5 py-3.5">
         {isExpired ? (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border bg-red-500/10 text-red-400 border-red-500/20">
+          <span
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold font-body"
+            style={{ background: 'rgba(239,68,68,0.1)', color: '#F87171', border: '1px solid rgba(239,68,68,0.2)' }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
             Expirado
           </span>
         ) : (
-          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border bg-brand/10 text-brand border-brand/20">
-            Ativo · {expiresIn}h restantes
+          <span
+            className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold font-body"
+            style={{ background: 'rgba(255,215,0,0.08)', color: '#FFD700', border: '1px solid rgba(255,215,0,0.2)' }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
+            Ativo · {expiresIn}h
           </span>
         )}
       </td>
-      <td className="px-4 py-3 text-xs text-zinc-500">
-        {new Date(token.expires_at).toLocaleString('pt-BR', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-        })}
+      <td className="px-5 py-3.5">
+        <span className="text-xs font-body" style={{ color: 'rgba(255,255,255,0.2)' }}>
+          {new Date(token.expires_at).toLocaleString('pt-BR', {
+            day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+          })}
+        </span>
       </td>
     </tr>
   );
 }
 
+// ─── Success banner ───────────────────────────────────────────────────
 function SuccessBanner() {
   const searchParams = useSearchParams();
   const success = searchParams.get('success');
-  const platformLabel =
-    success === 'ml' ? 'Mercado Livre' : success === 'shopee' ? 'Shopee' : null;
+  const label = success === 'ml' ? 'Mercado Livre' : success === 'shopee' ? 'Shopee' : null;
+  if (!label) return null;
 
-  if (!platformLabel) return null;
   return (
-    <div className="mb-6 flex items-center gap-3 bg-brand/10 border border-brand/30 text-brand rounded-xl px-5 py-4">
-      <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-      <p className="text-sm font-medium">
-        Lojista conectado ao {platformLabel} com sucesso!
+    <div
+      className="mb-6 flex items-center gap-3 rounded-2xl px-5 py-4"
+      style={{
+        background: 'rgba(255,215,0,0.06)',
+        border: '1px solid rgba(255,215,0,0.25)',
+      }}
+    >
+      <div
+        className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+        style={{ background: 'rgba(255,215,0,0.15)' }}
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="#FFD700" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </div>
+      <p className="text-sm font-body" style={{ color: '#FFD700' }}>
+        Lojista conectado ao <strong>{label}</strong> com sucesso!
       </p>
     </div>
   );
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────
 export default function ConectarPage() {
-  const [mlLoading, setMlLoading]     = useState(false);
+  const [mlLoading,     setMlLoading]     = useState(false);
   const [shopeeLoading, setShopeeLoading] = useState(false);
-  const [connectError, setConnectError]   = useState<string | null>(null);
+  const [connectError,  setConnectError]  = useState<string | null>(null);
 
-  const [sellers, setSellers] = useState<SellerToken[]>([]);
+  const [sellers,       setSellers]       = useState<SellerToken[]>([]);
   const [sellersLoading, setSellersLoading] = useState(true);
-  const [sellersError, setSellersError] = useState<string | null>(null);
+  const [sellersError,  setSellersError]  = useState<string | null>(null);
 
   useEffect(() => {
     getConnectedSellers()
@@ -136,121 +202,146 @@ export default function ConectarPage() {
   }, []);
 
   async function handleConnectML() {
-    setMlLoading(true);
-    setConnectError(null);
-    try {
-      const url = await getMLAuthUrl();
-      window.location.href = url;
-    } catch (err) {
-      setConnectError(err instanceof Error ? err.message : 'Erro ao gerar URL do ML');
-      setMlLoading(false);
-    }
+    setMlLoading(true); setConnectError(null);
+    try { window.location.href = await getMLAuthUrl(); }
+    catch (err) { setConnectError(err instanceof Error ? err.message : 'Erro ao gerar URL do ML'); setMlLoading(false); }
   }
 
   async function handleConnectShopee() {
-    setShopeeLoading(true);
-    setConnectError(null);
-    try {
-      const url = await getShopeeAuthUrl();
-      window.location.href = url;
-    } catch (err) {
-      setConnectError(
-        err instanceof Error ? err.message : 'Erro ao gerar URL da Shopee',
-      );
-      setShopeeLoading(false);
-    }
+    setShopeeLoading(true); setConnectError(null);
+    try { window.location.href = await getShopeeAuthUrl(); }
+    catch (err) { setConnectError(err instanceof Error ? err.message : 'Erro ao gerar URL da Shopee'); setShopeeLoading(false); }
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
-      {/* Cabeçalho */}
+    <div className="p-8 max-w-4xl mx-auto animate-fade-in">
+
+      {/* ── Header ──────────────────────────────────────────── */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white">Conectar Lojistas</h1>
-        <p className="text-sm text-zinc-500 mt-1">
+        <p className="text-[10px] uppercase tracking-[0.18em] font-semibold font-body mb-1" style={{ color: 'rgba(255,215,0,0.6)' }}>
+          ⚡ VOLTIC OPS
+        </p>
+        <h1
+          className="text-4xl font-bold leading-none text-white"
+          style={{ fontFamily: 'var(--font-rajdhani), system-ui', letterSpacing: '0.02em' }}
+        >
+          Conectar Lojistas
+        </h1>
+        <p className="text-sm font-body mt-2" style={{ color: 'rgba(255,255,255,0.3)' }}>
           Autorize o acesso às plataformas para sincronizar pedidos automaticamente.
         </p>
       </div>
 
-      {/* Banner de sucesso — Suspense necessário por useSearchParams */}
+      {/* Success / Error banners */}
       <Suspense fallback={null}>
         <SuccessBanner />
       </Suspense>
 
-      {/* Banner de erro */}
       {connectError && (
-        <div className="mb-6 flex items-center gap-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl px-5 py-4">
-          <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <div
+          className="mb-6 flex items-center gap-3 rounded-2xl px-5 py-4"
+          style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}
+        >
+          <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="#F87171" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
           </svg>
-          <p className="text-sm">{connectError}</p>
+          <p className="text-sm font-body" style={{ color: '#F87171' }}>{connectError}</p>
         </div>
       )}
 
-      {/* Botões de conexão */}
+      {/* ── Platform cards ───────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10">
-        <ConnectButton
+        <PlatformCard
           label="Mercado Livre"
           description="OAuth 2.0 · pedidos ready_to_ship"
-          color="border-yellow-400/20 bg-yellow-400/5"
-          logo={
-            <div className="w-10 h-10 rounded-lg bg-yellow-400/20 flex items-center justify-center shrink-0">
-              <span className="text-yellow-400 font-black text-lg">ML</span>
-            </div>
-          }
+          isML={true}
           onConnect={() => void handleConnectML()}
           loading={mlLoading}
         />
-        <ConnectButton
+        <PlatformCard
           label="Shopee"
           description="HMAC-SHA256 · pedidos READY_TO_SHIP"
-          color="border-orange-400/20 bg-orange-400/5"
-          logo={
-            <div className="w-10 h-10 rounded-lg bg-orange-400/20 flex items-center justify-center shrink-0">
-              <span className="text-orange-400 font-black text-sm">SHP</span>
-            </div>
-          }
+          isML={false}
           onConnect={() => void handleConnectShopee()}
           loading={shopeeLoading}
         />
       </div>
 
-      {/* Lista de lojistas conectados */}
+      {/* ── Connected sellers ────────────────────────────────── */}
       <div>
-        <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-3">
-          Lojistas conectados
-        </h2>
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+        <div className="flex items-center gap-3 mb-4">
+          <h2
+            className="text-[10px] font-semibold uppercase tracking-[0.18em] font-body"
+            style={{ color: 'rgba(255,255,255,0.3)' }}
+          >
+            Lojistas conectados
+          </h2>
+          <div className="flex-1 h-px" style={{ background: 'rgba(147,51,234,0.12)' }} />
+          {sellers.length > 0 && (
+            <span className="text-[10px] font-body" style={{ color: 'rgba(255,255,255,0.2)' }}>
+              {sellers.length} {sellers.length === 1 ? 'lojista' : 'lojistas'}
+            </span>
+          )}
+        </div>
+
+        <div
+          className="rounded-2xl overflow-hidden"
+          style={{
+            background: 'rgba(255,255,255,0.025)',
+            border: '1px solid rgba(147,51,234,0.15)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            boxShadow: '0 4px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+          }}
+        >
           {sellersLoading ? (
-            <div className="py-10 text-center">
-              <div className="inline-block w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm text-zinc-500 mt-2">Carregando...</p>
+            <div className="py-14 text-center">
+              <div
+                className="inline-block w-7 h-7 rounded-full border-2 animate-spin mb-4"
+                style={{ borderColor: 'rgba(255,215,0,0.2)', borderTopColor: '#FFD700' }}
+              />
+              <p className="text-sm font-body" style={{ color: 'rgba(255,255,255,0.2)' }}>Carregando...</p>
             </div>
           ) : sellersError ? (
-            <div className="py-10 text-center px-4">
-              <p className="text-sm text-zinc-500">
+            <div className="py-12 text-center px-6">
+              <p className="text-sm font-body" style={{ color: 'rgba(255,255,255,0.3)' }}>
                 Endpoint{' '}
-                <code className="font-mono text-xs bg-zinc-800 px-1.5 py-0.5 rounded">
+                <code
+                  className="font-mono text-xs px-1.5 py-0.5 rounded"
+                  style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.5)' }}
+                >
                   GET /api/v1/sellers
                 </code>{' '}
-                ainda não implementado no backend.
+                ainda não implementado.
               </p>
-              <p className="text-xs text-zinc-600 mt-1">
-                Os tokens já conectados estão salvos no Supabase (tabela{' '}
+              <p className="text-xs font-body mt-1.5" style={{ color: 'rgba(255,255,255,0.18)' }}>
+                Os tokens estão salvos no Supabase (tabela{' '}
                 <code className="font-mono">seller_tokens</code>).
               </p>
             </div>
           ) : sellers.length === 0 ? (
-            <div className="py-10 text-center text-sm text-zinc-500">
-              Nenhum lojista conectado ainda.
+            <div className="py-14 text-center">
+              <div
+                className="w-12 h-12 mx-auto rounded-2xl flex items-center justify-center mb-3"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(147,51,234,0.15)' }}
+              >
+                <svg className="w-6 h-6" style={{ color: 'rgba(255,255,255,0.2)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+                </svg>
+              </div>
+              <p className="text-sm font-body" style={{ color: 'rgba(255,255,255,0.2)' }}>
+                Nenhum lojista conectado ainda.
+              </p>
             </div>
           ) : (
             <table className="w-full text-left">
               <thead>
-                <tr className="border-b border-zinc-800">
-                  {['Seller ID', 'Plataforma', 'Status', 'Expira em'].map((h) => (
+                <tr style={{ borderBottom: '1px solid rgba(147,51,234,0.12)' }}>
+                  {['Seller ID', 'Plataforma', 'Status', 'Expira em'].map(h => (
                     <th
                       key={h}
-                      className="px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wider"
+                      className="px-5 py-3.5 text-[10px] font-semibold uppercase tracking-[0.1em] font-body"
+                      style={{ color: 'rgba(255,255,255,0.25)' }}
                     >
                       {h}
                     </th>
@@ -258,9 +349,7 @@ export default function ConectarPage() {
                 </tr>
               </thead>
               <tbody>
-                {sellers.map((t) => (
-                  <SellerRow key={t.id} token={t} />
-                ))}
+                {sellers.map(t => <SellerRow key={t.id} token={t} />)}
               </tbody>
             </table>
           )}
