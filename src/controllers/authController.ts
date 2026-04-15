@@ -7,7 +7,46 @@ import { AppError } from '../middlewares/errorHandler';
 import { ApiResponse } from '../types';
 import { supabase } from '../lib/supabase';
 
-// ── Seller Auth ──────────────────────────────────────────────────────────────
+// ── Admin Auth ───────────────────────────────────────────────────────────────
+
+export async function adminLogin(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { email, password } = req.body as { email?: string; password?: string };
+    if (!email || !password) throw new AppError(400, 'E-mail e senha são obrigatórios');
+
+    const { data: account, error } = await supabase
+      .from('admin_accounts')
+      .select('id, password_hash')
+      .eq('email', email.toLowerCase())
+      .single();
+
+    if (error || !account) throw new AppError(401, 'E-mail ou senha inválidos');
+
+    const valid = await bcrypt.compare(password, account.password_hash);
+    if (!valid) throw new AppError(401, 'E-mail ou senha inválidos');
+
+    const sessionToken = crypto.randomUUID();
+
+    await supabase
+      .from('admin_accounts')
+      .update({ session_token: sessionToken })
+      .eq('id', account.id);
+
+    const body: ApiResponse<{ token: string }> = {
+      success: true,
+      data: { token: sessionToken },
+    };
+    res.json(body);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── Seller Auth ───────────────────────────────────────────────────────────────
 
 export async function sellerRegister(
   req: Request,
