@@ -18,6 +18,12 @@ const rajdhani = Rajdhani({
 export const metadata: Metadata = {
   title: 'Voltic — Painel Operacional',
   description: 'Painel de operações de last-mile delivery · São Paulo',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Voltic',
+  },
 };
 
 export default function RootLayout({
@@ -27,6 +33,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" className="dark">
+      <head>
+        <meta name="theme-color" content="#06040F" />
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <script dangerouslySetInnerHTML={{
+          __html: `if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');`
+        }} />
+      </head>
       <body
         className={`${inter.variable} ${rajdhani.variable} font-sans min-h-screen antialiased`}
         style={{ background: '#06040F', color: '#fff' }}
