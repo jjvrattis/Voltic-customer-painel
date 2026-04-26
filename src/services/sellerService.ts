@@ -263,6 +263,62 @@ export async function getOrCreatePendingCharge(
   return charge as SellerCharge;
 }
 
+// ── Coletas manuais ───────────────────────────────────────────────────────────
+
+export interface CollectionRequest {
+  id: string;
+  seller_id: string;
+  ml_count: number;
+  ecommerce_count: number;
+  total_count: number;
+  notes: string | null;
+  status: 'pending' | 'collected' | 'cancelled';
+  requested_at: string;
+  collected_at: string | null;
+}
+
+export async function createCollectionRequest(
+  sellerId: string,
+  mlCount: number,
+  ecommerceCount: number,
+  notes?: string,
+): Promise<CollectionRequest> {
+  const { data, error } = await supabase
+    .from('collection_requests')
+    .insert({
+      seller_id:       sellerId,
+      ml_count:        mlCount,
+      ecommerce_count: ecommerceCount,
+      notes:           notes ?? null,
+    })
+    .select()
+    .single();
+
+  if (error || !data) throw new AppError(500, `Erro ao criar coleta: ${error?.message}`);
+  logger.info({ sellerId, mlCount, ecommerceCount }, 'Coleta solicitada');
+  return data as CollectionRequest;
+}
+
+export async function listCollectionRequests(
+  sellerId: string,
+  page: number,
+  limit: number,
+): Promise<{ items: CollectionRequest[]; total: number; page: number; limit: number }> {
+  const p    = Math.max(1, page);
+  const lim  = Math.min(50, limit);
+  const from = (p - 1) * lim;
+
+  const { data, error, count } = await supabase
+    .from('collection_requests')
+    .select('*', { count: 'exact' })
+    .eq('seller_id', sellerId)
+    .order('requested_at', { ascending: false })
+    .range(from, from + lim - 1);
+
+  if (error) throw new AppError(500, `Erro ao buscar coletas: ${error.message}`);
+  return { items: (data ?? []) as CollectionRequest[], total: count ?? 0, page: p, limit: lim };
+}
+
 // ── Confirmar pagamento (webhook) ─────────────────────────────────────────────
 
 export async function confirmPayment(abacatepayId: string): Promise<void> {

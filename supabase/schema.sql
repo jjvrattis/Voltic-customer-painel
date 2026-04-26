@@ -130,10 +130,57 @@ create index if not exists seller_charges_abacatepay_idx   on seller_charges (ab
 
 alter table seller_charges enable row level security;
 
+-- ── collection_requests ──────────────────────────────────────────────────────
+create table if not exists collection_requests (
+  id               uuid primary key default gen_random_uuid(),
+  seller_id        text not null,
+  ml_count         integer not null default 0,
+  ecommerce_count  integer not null default 0,
+  total_count      integer generated always as (ml_count + ecommerce_count) stored,
+  notes            text,
+  status           text not null default 'pending',  -- pending | collected | cancelled
+  requested_at     timestamptz not null default now(),
+  collected_at     timestamptz
+);
+
+comment on table collection_requests is 'Solicitações manuais de coleta feitas pelos sellers';
+
+create index if not exists collection_requests_seller_id_idx  on collection_requests (seller_id);
+create index if not exists collection_requests_status_idx     on collection_requests (status);
+create index if not exists collection_requests_requested_at_idx on collection_requests (requested_at desc);
+
+alter table collection_requests enable row level security;
+
+-- ── admin_accounts ───────────────────────────────────────────────────────────
+create table if not exists admin_accounts (
+  id             uuid primary key default gen_random_uuid(),
+  email          text not null unique,
+  password_hash  text not null,
+  session_token  text,
+  created_at     timestamptz not null default now()
+);
+
+comment on table admin_accounts is 'Contas de administrador do painel Voltic';
+
+-- ── seller_accounts ───────────────────────────────────────────────────────────
+create table if not exists seller_accounts (
+  id             uuid primary key default gen_random_uuid(),
+  seller_id      text not null,
+  email          text not null unique,
+  password_hash  text not null,
+  created_at     timestamptz not null default now()
+);
+
+comment on table seller_accounts is 'Credenciais de acesso dos sellers ao app mobile';
+
+create index if not exists seller_accounts_seller_id_idx on seller_accounts (seller_id);
+
 -- ── Row Level Security (habilitar mas sem policies restritivas por ora) ──────
-alter table seller_tokens enable row level security;
-alter table orders         enable row level security;
-alter table collectors     enable row level security;
+alter table seller_tokens    enable row level security;
+alter table orders            enable row level security;
+alter table collectors        enable row level security;
+alter table admin_accounts    enable row level security;
+alter table seller_accounts   enable row level security;
 
 -- Service role bypasses RLS — a API usa service_role_key, então tem acesso total.
 -- Adicione policies específicas se quiser expor via anon/auth keys no futuro.

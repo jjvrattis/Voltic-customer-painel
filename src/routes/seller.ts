@@ -5,6 +5,8 @@ import {
   pedidosHandler,
   financeiroHandler,
   createChargeHandler,
+  createColetaHandler,
+  listColetasHandler,
 } from '../controllers/sellerController';
 
 const router = Router();
@@ -16,5 +18,9 @@ router.get('/dashboard', dashboardHandler);
 router.get('/pedidos',   pedidosHandler);
 router.get('/financeiro', financeiroHandler);
 router.post('/financeiro/charge', createChargeHandler);
+
+// Coletas manuais
+router.post('/coletas', createColetaHandler);
+router.get('/coletas',  listColetasHandler);
 
 export default router;
