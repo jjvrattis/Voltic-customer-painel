@@ -145,6 +145,13 @@ export async function sellerLogin(
       throw new AppError(401, 'Seller não possui conexão ativa');
     }
 
+    // Renova a sessão por 90 dias a cada login
+    const newExpiry = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+    await supabase
+      .from('onboarding_invites')
+      .update({ expires_at: newExpiry })
+      .eq('token', invite.token);
+
     const body: ApiResponse<{ token: string; seller_id: string }> = {
       success: true,
       data: { token: invite.token, seller_id: account.seller_id },
