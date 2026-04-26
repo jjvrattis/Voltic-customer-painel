@@ -1,7 +1,10 @@
 import { supabase } from '../lib/supabase';
 import { AppError } from '../middlewares/errorHandler';
 import { logger } from '../lib/logger';
-import { SellerCredit, SellerCharge, SellerDashboardData, Order } from '../types';
+import {
+  SellerCredit, SellerCharge, SellerDashboardData, Order,
+  SellerProfile, CollectionRequest,
+} from '../types';
 import { SellerCustomer } from './abacatePayService';
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
@@ -27,7 +30,6 @@ export async function getSellerDashboard(sellerId: string): Promise<SellerDashbo
     throw new AppError(500, `Erro ao buscar pedidos: ${ordersResult.error.message}`);
   }
 
-  // Criar crédito padrão se não existir
   let credit: SellerCredit;
   if (creditResult.error || !creditResult.data) {
     const { data: newCredit, error: createErr } = await supabase
@@ -48,7 +50,7 @@ export async function getSellerDashboard(sellerId: string): Promise<SellerDashbo
     if (s in counts) counts[s]++;
   }
 
-  const remaining   = Math.max(0, credit.credit_limit - credit.credit_used);
+  const remaining    = Math.max(0, credit.credit_limit - credit.credit_used);
   const pctRemaining = credit.credit_limit > 0
     ? Math.round((remaining / credit.credit_limit) * 100)
     : 0;
@@ -92,40 +94,85 @@ export async function getSellerOrders(
   return { items: (data ?? []) as Order[], total: count ?? 0, page, limit };
 }
 
+// ── Pedidos disponíveis para coleta ──────────────────────────────────────────
+
+export async function getAvailableOrders(sellerId: string): Promise<Order[]> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('id, platform, external_order_id, tracking_number, status, created_at')
+    .eq('seller_id', sellerId)
+    .eq('status', 'ready_to_ship')
+    .order('created_at', { ascending: false });
+
+  if (error) throw new AppError(500, `Erro ao buscar pedidos disponíveis: ${error.message}`);
+  return (data ?? []) as Order[];
+}
+
+// ── Perfil do seller ──────────────────────────────────────────────────────────
+
+export async function getSellerProfile(sellerId: string): Promise<SellerProfile | null> {
+  const { data, error } = await supabase
+    .from('seller_profiles')
+    .select('*')
+    .eq('seller_id', sellerId)
+    .single();
+
+  if (error || !data) return null;
+  return data as SellerProfile;
+}
+
+export async function upsertSellerProfile(
+  sellerId: string,
+  profile: Partial<Omit<SellerProfile, 'id' | 'seller_id' | 'created_at' | 'updated_at'>>,
+): Promise<SellerProfile> {
+  const { data, error } = await supabase
+    .from('seller_profiles')
+    .upsert(
+      { seller_id: sellerId, ...profile, updated_at: new Date().toISOString() },
+      { onConflict: 'seller_id' },
+    )
+    .select()
+    .single();
+
+  if (error || !data) throw new AppError(500, `Erro ao salvar perfil: ${error?.message}`);
+  logger.info({ sellerId }, 'Perfil do seller atualizado');
+  return data as SellerProfile;
+}
+
 // ── Financeiro ────────────────────────────────────────────────────────────────
 
 export async function calcAmountDue(
   sellerId: string,
-  creditUsed: number,
-): Promise<{ amount_cents: number; ml_count: number; shopee_count: number }> {
-  if (creditUsed === 0) return { amount_cents: 0, ml_count: 0, shopee_count: 0 };
-
-  // Pega os N pedidos mais recentes onde N = credit_used (fonte de verdade)
-  const { data: orders } = await supabase
-    .from('orders')
-    .select('platform')
+  cycleStart: string,
+  cycleEnd: string,
+): Promise<{ amount_cents: number; ml_count: number; shopee_count: number; ecom_count: number }> {
+  // Usa collection_requests coletadas no ciclo como fonte de verdade para cobrança
+  const { data: coletas } = await supabase
+    .from('collection_requests')
+    .select('ml_count, shopee_count, ecommerce_count, ecommerce_proprio_count')
     .eq('seller_id', sellerId)
-    .neq('status', 'cancelled')
-    .order('created_at', { ascending: false })
-    .limit(creditUsed);
+    .eq('status', 'collected')
+    .gte('requested_at', cycleStart + 'T00:00:00.000Z')
+    .lte('requested_at', cycleEnd   + 'T23:59:59.999Z');
 
-  const found       = orders ?? [];
-  const mlCount     = found.filter((o) => o.platform === 'mercadolivre').length;
-  const shopeeCount = found.filter((o) => o.platform === 'shopee').length;
-
-  // Pedidos não encontrados no banco são tratados como ML (fallback)
-  const unmatched   = Math.max(0, creditUsed - mlCount - shopeeCount);
-  const effectiveMl = mlCount + unmatched;
+  let mlCount = 0, shopeeCount = 0, ecomCount = 0;
+  for (const c of coletas ?? []) {
+    mlCount     += c.ml_count               ?? 0;
+    shopeeCount += c.shopee_count            ?? 0;
+    ecomCount   += (c.ecommerce_count ?? 0) + (c.ecommerce_proprio_count ?? 0);
+  }
 
   const priceMl     = Number(process.env.PRICE_ML_CENTS     ?? 1150);
   const priceShopee = Number(process.env.PRICE_SHOPEE_CENTS ?? 800);
+  const priceEcom   = 800;
 
-  logger.info({ sellerId, creditUsed, effectiveMl, shopeeCount, unmatched }, 'calcAmountDue');
+  logger.info({ sellerId, mlCount, shopeeCount, ecomCount }, 'calcAmountDue');
 
   return {
-    amount_cents: effectiveMl * priceMl + shopeeCount * priceShopee,
-    ml_count:     effectiveMl,
+    amount_cents: mlCount * priceMl + shopeeCount * priceShopee + ecomCount * priceEcom,
+    ml_count:    mlCount,
     shopee_count: shopeeCount,
+    ecom_count:   ecomCount,
   };
 }
 
@@ -153,7 +200,7 @@ export async function getSellerFinanceiro(sellerId: string) {
     credit = creditResult.data as SellerCredit;
   }
 
-  const charges = (chargesResult.data ?? []) as SellerCharge[];
+  const charges      = (chargesResult.data ?? []) as SellerCharge[];
   const pendingCharge = charges.find(
     (c) => c.status === 'pending' && new Date(c.expires_at) > new Date(),
   ) ?? null;
@@ -163,9 +210,10 @@ export async function getSellerFinanceiro(sellerId: string) {
     ? Math.round((remaining / credit.credit_limit) * 100)
     : 0;
 
-  const { amount_cents, ml_count, shopee_count } = await calcAmountDue(
+  const { amount_cents, ml_count, shopee_count, ecom_count } = await calcAmountDue(
     sellerId,
-    credit.credit_used,
+    credit.cycle_start,
+    credit.cycle_end,
   );
 
   return {
@@ -178,9 +226,10 @@ export async function getSellerFinanceiro(sellerId: string) {
       cycle_end:     credit.cycle_end,
       low_credit:    pctRemaining < 20,
     },
-    amount_due:   amount_cents,
+    amount_due:    amount_cents,
     ml_count,
     shopee_count,
+    ecom_count,
     charges,
     pending_charge: pendingCharge,
   };
@@ -205,9 +254,14 @@ export async function getOrCreatePendingCharge(
   if (!creditData) throw new AppError(404, 'Crédito do seller não encontrado');
   const credit = creditData as SellerCredit;
 
-  if (credit.credit_used === 0) throw new AppError(400, 'Seller não tem crédito a pagar');
+  const { amount_cents: amountCents } = await calcAmountDue(
+    sellerId,
+    credit.cycle_start,
+    credit.cycle_end,
+  );
 
-  // Verificar se já tem cobrança pendente válida
+  if (amountCents === 0) throw new AppError(400, 'Seller não tem valor a pagar');
+
   const { data: existing } = await supabase
     .from('seller_charges')
     .select('*')
@@ -220,7 +274,6 @@ export async function getOrCreatePendingCharge(
 
   if (existing) return existing as SellerCharge;
 
-  // Buscar dados do seller para o customer AbacatePay
   const { data: inviteData } = await supabase
     .from('onboarding_invites')
     .select('seller_name, seller_phone')
@@ -235,14 +288,7 @@ export async function getOrCreatePendingCharge(
     cellphone: inviteData?.seller_phone ?? null,
   };
 
-  const { amount_cents: amountCents } = await calcAmountDue(
-    sellerId,
-    credit.credit_used,
-  );
-
-  if (amountCents === 0) throw new AppError(400, 'Valor calculado é zero');
-
-  const pixData = await createFn(amountCents, customer);
+  const pixData   = await createFn(amountCents, customer);
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
   const { data: charge, error } = await supabase
@@ -265,37 +311,42 @@ export async function getOrCreatePendingCharge(
 
 // ── Coletas manuais ───────────────────────────────────────────────────────────
 
-export interface CollectionRequest {
-  id: string;
-  seller_id: string;
-  ml_count: number;
-  ecommerce_count: number;
-  total_count: number;
-  notes: string | null;
-  status: 'pending' | 'collected' | 'cancelled';
-  requested_at: string;
-  collected_at: string | null;
-}
-
 export async function createCollectionRequest(
   sellerId: string,
-  mlCount: number,
+  mlOrderIds: string[],
+  shopeeOrderIds: string[],
   ecommerceCount: number,
+  ecommerceProprioCount: number,
   notes?: string,
+  timeWindow?: string,
+  addressSnapshot?: Record<string, unknown>,
 ): Promise<CollectionRequest> {
+  const mlCount     = mlOrderIds.length;
+  const shopeeCount = shopeeOrderIds.length;
+
+  if (mlCount + shopeeCount + ecommerceCount + ecommerceProprioCount === 0) {
+    throw new AppError(400, 'Informe pelo menos 1 pacote.');
+  }
+
   const { data, error } = await supabase
     .from('collection_requests')
     .insert({
-      seller_id:       sellerId,
-      ml_count:        mlCount,
-      ecommerce_count: ecommerceCount,
-      notes:           notes ?? null,
+      seller_id:               sellerId,
+      ml_count:                mlCount,
+      shopee_count:            shopeeCount,
+      ecommerce_count:         ecommerceCount,
+      ecommerce_proprio_count: ecommerceProprioCount,
+      ml_order_ids:            mlOrderIds,
+      shopee_order_ids:        shopeeOrderIds,
+      notes:                   notes ?? null,
+      time_window:             timeWindow ?? 'qualquer',
+      address_snapshot:        addressSnapshot ?? null,
     })
     .select()
     .single();
 
   if (error || !data) throw new AppError(500, `Erro ao criar coleta: ${error?.message}`);
-  logger.info({ sellerId, mlCount, ecommerceCount }, 'Coleta solicitada');
+  logger.info({ sellerId, mlCount, shopeeCount, ecommerceCount, ecommerceProprioCount }, 'Coleta solicitada');
   return data as CollectionRequest;
 }
 

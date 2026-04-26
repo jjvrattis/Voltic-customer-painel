@@ -99,6 +99,59 @@ export interface SellerCharge {
   expires_at: string;
 }
 
+export type CollectionStatus =
+  | 'pending'
+  | 'accepted'
+  | 'en_route'
+  | 'arrived'
+  | 'collected'
+  | 'cancelled';
+
+export type TimeWindow = 'manha' | 'tarde' | 'qualquer';
+
+export interface SellerProfile {
+  id: string;
+  seller_id: string;
+  name: string | null;
+  phone: string | null;
+  cep: string | null;
+  street: string | null;
+  street_number: string | null;
+  complement: string | null;
+  neighborhood: string | null;
+  city: string | null;
+  state: string | null;
+  location_type: string;
+  floor_unit: string | null;
+  doorman_name: string | null;
+  intercom_code: string | null;
+  access_notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CollectionRequest {
+  id: string;
+  seller_id: string;
+  ml_count: number;
+  shopee_count: number;
+  ecommerce_count: number;
+  ecommerce_proprio_count: number;
+  total_count: number;
+  ml_order_ids: string[];
+  shopee_order_ids: string[];
+  notes: string | null;
+  time_window: TimeWindow;
+  address_snapshot: Record<string, unknown> | null;
+  agent_id: string | null;
+  status: CollectionStatus;
+  requested_at: string;
+  accepted_at: string | null;
+  en_route_at: string | null;
+  arrived_at: string | null;
+  collected_at: string | null;
+}
+
 export interface SellerDashboardData {
   orders_today: {
     ready_to_ship: number;
