@@ -132,24 +132,75 @@ alter table seller_charges enable row level security;
 
 -- ── collection_requests ──────────────────────────────────────────────────────
 create table if not exists collection_requests (
-  id               uuid primary key default gen_random_uuid(),
-  seller_id        text not null,
-  ml_count         integer not null default 0,
-  ecommerce_count  integer not null default 0,
-  total_count      integer generated always as (ml_count + ecommerce_count) stored,
-  notes            text,
-  status           text not null default 'pending',  -- pending | collected | cancelled
-  requested_at     timestamptz not null default now(),
-  collected_at     timestamptz
+  id                       uuid        primary key default gen_random_uuid(),
+  seller_id                text        not null,
+  -- contagens por plataforma
+  ml_count                 integer     not null default 0,
+  shopee_count             integer     not null default 0,
+  ecommerce_count          integer     not null default 0,   -- e-commerce genérico (R$8)
+  ecommerce_proprio_count  integer     not null default 0,   -- e-commerce próprio  (R$8)
+  total_count              integer
+    generated always as (ml_count + shopee_count + ecommerce_count + ecommerce_proprio_count) stored,
+  -- pedidos vinculados (external_order_ids das plataformas)
+  ml_order_ids             text[]      not null default '{}',
+  shopee_order_ids         text[]      not null default '{}',
+  -- logística
+  notes                    text,
+  time_window              text        not null default 'qualquer',  -- manha | tarde | qualquer
+  address_snapshot         jsonb,
+  agent_id                 uuid        references collectors(id) on delete set null,
+  -- status expandido
+  status                   text        not null default 'pending',
+  -- pending | accepted | en_route | arrived | collected | cancelled
+  requested_at             timestamptz not null default now(),
+  accepted_at              timestamptz,
+  en_route_at              timestamptz,
+  arrived_at               timestamptz,
+  collected_at             timestamptz
 );
 
-comment on table collection_requests is 'Solicitações manuais de coleta feitas pelos sellers';
+comment on table  collection_requests                          is 'Solicitações de coleta feitas pelos sellers';
+comment on column collection_requests.ml_order_ids            is 'external_order_ids dos pedidos ML selecionados';
+comment on column collection_requests.shopee_order_ids        is 'external_order_ids dos pedidos Shopee selecionados';
+comment on column collection_requests.ecommerce_proprio_count is 'Pacotes e-commerce próprio (R$8 cada)';
+comment on column collection_requests.time_window             is 'manha | tarde | qualquer';
+comment on column collection_requests.address_snapshot        is 'Snapshot do endereço no momento da solicitação';
 
-create index if not exists collection_requests_seller_id_idx  on collection_requests (seller_id);
-create index if not exists collection_requests_status_idx     on collection_requests (status);
+create index if not exists collection_requests_seller_id_idx    on collection_requests (seller_id);
+create index if not exists collection_requests_status_idx       on collection_requests (status);
 create index if not exists collection_requests_requested_at_idx on collection_requests (requested_at desc);
 
 alter table collection_requests enable row level security;
+
+-- ── seller_profiles ───────────────────────────────────────────────────────────
+create table if not exists seller_profiles (
+  id                uuid        primary key default gen_random_uuid(),
+  seller_id         text        not null unique,
+  name              text,
+  phone             text,
+  cep               text,
+  street            text,
+  street_number     text,
+  complement        text,
+  neighborhood      text,
+  city              text,
+  state             char(2),
+  location_type     text        not null default 'residencia',
+  floor_unit        text,
+  doorman_name      text,
+  intercom_code     text,
+  access_notes      text,
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
+);
+
+comment on table  seller_profiles               is 'Perfil e endereço de coleta dos sellers';
+comment on column seller_profiles.location_type is 'residencia | predio_comercial | galpao | loja';
+comment on column seller_profiles.floor_unit    is 'Andar, sala ou número da unidade';
+comment on column seller_profiles.access_notes  is 'Instruções fixas de acesso';
+
+create index if not exists seller_profiles_seller_id_idx on seller_profiles (seller_id);
+alter  table seller_profiles enable row level security;
 
 -- ── admin_accounts ───────────────────────────────────────────────────────────
 create table if not exists admin_accounts (

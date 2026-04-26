@@ -3,23 +3,30 @@ import { sellerAuth } from '../middlewares/sellerAuth';
 import {
   dashboardHandler,
   pedidosHandler,
+  availableOrdersHandler,
   financeiroHandler,
   createChargeHandler,
+  getProfileHandler,
+  upsertProfileHandler,
   createColetaHandler,
   listColetasHandler,
 } from '../controllers/sellerController';
 
 const router = Router();
 
-// Todas as rotas exigem token de seller
 router.use(sellerAuth);
 
-router.get('/dashboard', dashboardHandler);
-router.get('/pedidos',   pedidosHandler);
-router.get('/financeiro', financeiroHandler);
+router.get('/dashboard',          dashboardHandler);
+router.get('/pedidos',            pedidosHandler);
+router.get('/orders/available',   availableOrdersHandler);
+router.get('/financeiro',         financeiroHandler);
 router.post('/financeiro/charge', createChargeHandler);
 
-// Coletas manuais
+// Perfil
+router.get('/profile',  getProfileHandler);
+router.put('/profile',  upsertProfileHandler);
+
+// Coletas
 router.post('/coletas', createColetaHandler);
 router.get('/coletas',  listColetasHandler);
 
