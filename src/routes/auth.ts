@@ -6,6 +6,7 @@ import {
   shopeeGetUrl,
   shopeeCallback,
   sellerRegister,
+  sellerSignup,
   sellerLogin,
   adminLogin,
 } from '../controllers/authController';
@@ -21,6 +22,7 @@ router.post('/ml/refresh', mlRefresh);
 router.post('/admin/login', adminLogin);
 
 // Seller Auth
+router.post('/seller/signup',   sellerSignup);
 router.post('/seller/register', sellerRegister);
 router.post('/seller/login',    sellerLogin);
 

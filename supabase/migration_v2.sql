@@ -200,6 +200,18 @@ create table if not exists admin_accounts (
 );
 alter table admin_accounts enable row level security;
 
+-- ── activation_codes ─────────────────────────────────────────
+create table if not exists activation_codes (
+  id         uuid        primary key default gen_random_uuid(),
+  code       text        not null unique,
+  seller_id  text,
+  used       boolean     not null default false,
+  used_at    timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists activation_codes_code_idx on activation_codes (code);
+alter table activation_codes enable row level security;
+
 -- ── seller_accounts ───────────────────────────────────────────
 create table if not exists seller_accounts (
   id            uuid        primary key default gen_random_uuid(),

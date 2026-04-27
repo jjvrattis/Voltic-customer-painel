@@ -48,6 +48,85 @@ export async function adminLogin(
 
 // ── Seller Auth ───────────────────────────────────────────────────────────────
 
+export async function sellerSignup(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { name, phone, email, password, activation_code } = req.body as {
+      name?: string;
+      phone?: string;
+      email?: string;
+      password?: string;
+      activation_code?: string;
+    };
+
+    if (!name || !email || !password || !activation_code) {
+      throw new AppError(400, 'Nome, e-mail, senha e código de ativação são obrigatórios');
+    }
+    if (password.length < 6) {
+      throw new AppError(400, 'Senha deve ter ao menos 6 caracteres');
+    }
+
+    const { data: code, error: codeErr } = await supabase
+      .from('activation_codes')
+      .select('id')
+      .eq('code', activation_code.toUpperCase())
+      .eq('used', false)
+      .single();
+
+    if (codeErr || !code) {
+      throw new AppError(401, 'Código de ativação inválido ou já utilizado');
+    }
+
+    const { data: existing } = await supabase
+      .from('seller_accounts')
+      .select('id')
+      .eq('email', email.toLowerCase())
+      .single();
+
+    if (existing) throw new AppError(409, 'E-mail já cadastrado');
+
+    const sellerId = crypto.randomUUID();
+    const password_hash = await bcrypt.hash(password, 10);
+    const sessionToken = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
+
+    const { error: accountErr } = await supabase.from('seller_accounts').insert({
+      seller_id: sellerId,
+      email: email.toLowerCase(),
+      password_hash,
+    });
+    if (accountErr) throw new AppError(500, `Erro ao criar conta: ${accountErr.message}`);
+
+    await supabase.from('seller_credits').insert({ seller_id: sellerId });
+
+    await supabase.from('onboarding_invites').insert({
+      token: sessionToken,
+      seller_name: name.trim(),
+      seller_phone: phone?.trim() ?? null,
+      status: 'connected',
+      seller_id: sellerId,
+      connected_at: new Date().toISOString(),
+      expires_at: expiresAt,
+    });
+
+    await supabase
+      .from('activation_codes')
+      .update({ used: true, used_at: new Date().toISOString(), seller_id: sellerId })
+      .eq('id', code.id);
+
+    const body: ApiResponse<{ token: string; seller_id: string }> = {
+      success: true,
+      data: { token: sessionToken, seller_id: sellerId },
+    };
+    res.status(201).json(body);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function sellerRegister(
   req: Request,
   res: Response,

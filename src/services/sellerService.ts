@@ -315,15 +315,14 @@ export async function createCollectionRequest(
   sellerId: string,
   mlOrderIds: string[],
   shopeeOrderIds: string[],
+  mlCount: number,
+  shopeeCount: number,
   ecommerceCount: number,
   ecommerceProprioCount: number,
   notes?: string,
   timeWindow?: string,
   addressSnapshot?: Record<string, unknown>,
 ): Promise<CollectionRequest> {
-  const mlCount     = mlOrderIds.length;
-  const shopeeCount = shopeeOrderIds.length;
-
   if (mlCount + shopeeCount + ecommerceCount + ecommerceProprioCount === 0) {
     throw new AppError(400, 'Informe pelo menos 1 pacote.');
   }
