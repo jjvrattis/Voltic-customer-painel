@@ -116,18 +116,24 @@ export async function createColetaHandler(
       address_snapshot?:         Record<string, unknown>;
     };
 
+    const body2 = req.body as Record<string, unknown>;
+
     const mlIds     = Array.isArray(ml_order_ids)     ? ml_order_ids     : [];
     const shopeeIds = Array.isArray(shopee_order_ids) ? shopee_order_ids : [];
-    const ecom      = Math.max(0, Math.floor(Number(ecommerce_count          ?? 0)));
-    const ecomProp  = Math.max(0, Math.floor(Number(ecommerce_proprio_count  ?? 0)));
 
-    if (mlIds.length + shopeeIds.length + ecom + ecomProp === 0) {
+    // Aceita contagem explícita quando não há IDs selecionados (entrada manual)
+    const mlCount     = mlIds.length     > 0 ? mlIds.length     : Math.max(0, Math.floor(Number(body2['ml_count']     ?? 0)));
+    const shopeeCount = shopeeIds.length > 0 ? shopeeIds.length : Math.max(0, Math.floor(Number(body2['shopee_count'] ?? 0)));
+    const ecom        = Math.max(0, Math.floor(Number(ecommerce_count         ?? 0)));
+    const ecomProp    = Math.max(0, Math.floor(Number(ecommerce_proprio_count ?? 0)));
+
+    if (mlCount + shopeeCount + ecom + ecomProp === 0) {
       res.status(400).json({ success: false, error: 'Informe pelo menos 1 pacote.' });
       return;
     }
 
     const coleta = await createCollectionRequest(
-      req.sellerId!, mlIds, shopeeIds, ecom, ecomProp,
+      req.sellerId!, mlIds, shopeeIds, mlCount, shopeeCount, ecom, ecomProp,
       notes, time_window, address_snapshot,
     );
     res.status(201).json({ success: true, data: coleta });
