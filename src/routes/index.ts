@@ -6,6 +6,7 @@ import onboardingRouter from './onboarding';
 import sellerRouter from './seller';
 import webhooksRouter from './webhooks';
 import { listSellersHandler } from '../controllers/onboardingController';
+import { runRecurringHandler } from '../controllers/sellerExtraController';
 
 const router = Router();
 
@@ -20,5 +21,8 @@ router.use('/onboarding', onboardingRouter);
 router.use('/seller', sellerRouter);
 router.use('/webhooks', webhooksRouter);
 router.get('/sellers', listSellersHandler);
+
+// Cron — disparado por serviço externo (cron-job.org, etc) com header x-cron-secret
+router.post('/jobs/recurring-collections', runRecurringHandler);
 
 export default router;
