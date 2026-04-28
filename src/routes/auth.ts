@@ -10,6 +10,7 @@ import {
   sellerLogin,
   adminLogin,
 } from '../controllers/authController';
+import { collectorLogin } from '../controllers/collectorController';
 
 const router = Router();
 
@@ -25,6 +26,9 @@ router.post('/admin/login', adminLogin);
 router.post('/seller/signup',   sellerSignup);
 router.post('/seller/register', sellerRegister);
 router.post('/seller/login',    sellerLogin);
+
+// Collector Auth
+router.post('/collector/login', collectorLogin);
 
 // Shopee
 router.get('/shopee/url', shopeeGetUrl);
