@@ -13,6 +13,7 @@ import {
   cancelProprioOrder,
   getProprioLabelHtml,
   runRecurringCollections,
+  getOrderDetailService,
 } from '../services/sellerExtraService';
 import { AppError } from '../middlewares/errorHandler';
 
@@ -160,5 +161,18 @@ export async function runRecurringHandler(
     }
     const result = await runRecurringCollections();
     res.json({ success: true, data: result });
+  } catch (err) { next(err); }
+}
+
+// ─── Order Detail ─────────────────────────────────────────────────────────────
+
+export async function orderDetailHandler(
+  req: Request, res: Response, next: NextFunction,
+): Promise<void> {
+  try {
+    const id = req.params['orderId'];
+    if (!id || typeof id !== 'string') throw new AppError(400, 'orderId obrigatório');
+    const data = await getOrderDetailService(req.sellerId!, id);
+    res.json({ success: true, data });
   } catch (err) { next(err); }
 }

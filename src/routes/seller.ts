@@ -23,6 +23,7 @@ import {
   listProprioHandler,
   getProprioHandler,
   cancelProprioHandler,
+  orderDetailHandler,
   proprioLabelHandler,
 } from '../controllers/sellerExtraController';
 
@@ -63,5 +64,6 @@ router.get('/orders/proprio',            listProprioHandler);
 router.get('/orders/proprio/:id',        getProprioHandler);
 router.delete('/orders/proprio/:id',     cancelProprioHandler);
 router.get('/orders/proprio/:id/label',  proprioLabelHandler);
+router.get('/orders/:orderId',            orderDetailHandler);
 
 export default router;

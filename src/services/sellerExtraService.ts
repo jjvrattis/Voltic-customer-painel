@@ -420,3 +420,76 @@ export async function runRecurringCollections(): Promise<{ created: number; skip
   logger.info({ created, skipped }, 'Recurring collections run');
   return { created, skipped };
 }
+
+// ─── Order Detail (tracking individual) ──────────────────────────────────────
+
+export interface OrderDetail {
+  id:                string;
+  platform:          string;
+  external_order_id: string;
+  status:            string;
+  tracking_number:   string | null;
+  polo:              string | null;
+  created_at:        string;
+  collected_at:      string | null;
+  collector_id:      string | null;
+  collector_location: {
+    lat: number; lng: number; heading: number | null; speed: number | null; updated_at: string;
+  } | null;
+  // Informações do comprador extraídas do raw_payload
+  buyer_name:   string | null;
+  buyer_city:   string | null;
+}
+
+export async function getOrderDetailService(
+  sellerId: string,
+  orderId: string,
+): Promise<OrderDetail> {
+  const { data: order, error } = await supabase
+    .from('orders')
+    .select('id, platform, external_order_id, status, tracking_number, polo, created_at, collected_at, collector_id, raw_payload')
+    .eq('id', orderId)
+    .eq('seller_id', sellerId)
+    .single();
+
+  if (error || !order) throw new AppError(404, 'Pedido não encontrado');
+
+  // Localização ao vivo do coletor / entregador
+  let collectorLocation: OrderDetail['collector_location'] = null;
+  if (order.collector_id) {
+    const { data: loc } = await supabase
+      .from('collector_locations')
+      .select('lat, lng, heading, speed, updated_at')
+      .eq('collector_id', order.collector_id)
+      .single();
+    if (loc) collectorLocation = loc;
+  }
+
+  // Extrai nome e cidade do comprador do payload bruto ML/Shopee
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const payload = order.raw_payload as any;
+  const buyerName: string | null =
+    payload?.buyer?.nickname
+    ?? payload?.buyer_user?.display_name
+    ?? payload?.shipping?.receiver_name
+    ?? null;
+  const buyerCity: string | null =
+    payload?.shipping?.receiver_address?.city?.name
+    ?? payload?.shipping?.address?.city
+    ?? null;
+
+  return {
+    id:                 order.id,
+    platform:           order.platform,
+    external_order_id:  order.external_order_id,
+    status:             order.status,
+    tracking_number:    order.tracking_number,
+    polo:               order.polo,
+    created_at:         order.created_at,
+    collected_at:       order.collected_at,
+    collector_id:       order.collector_id,
+    collector_location: collectorLocation,
+    buyer_name:         buyerName,
+    buyer_city:         buyerCity,
+  };
+}
