@@ -39,4 +39,8 @@ services:
         value: "1150"
       - key: PRICE_SHOPEE_CENTS
         value: "800"
+      - key: CRON_SECRET
+        sync: false
+      - key: EXPO_ACCESS_TOKEN
+        sync: false
     healthCheckPath: /api/v1/health
