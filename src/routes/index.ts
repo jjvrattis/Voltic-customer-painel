@@ -4,6 +4,7 @@ import syncRouter from './sync';
 import ordersRouter from './orders';
 import onboardingRouter from './onboarding';
 import sellerRouter from './seller';
+import collectorRouter from './collector';
 import webhooksRouter from './webhooks';
 import { listSellersHandler } from '../controllers/onboardingController';
 import { runRecurringHandler } from '../controllers/sellerExtraController';
@@ -19,6 +20,7 @@ router.use('/sync', syncRouter);
 router.use('/orders', ordersRouter);
 router.use('/onboarding', onboardingRouter);
 router.use('/seller', sellerRouter);
+router.use('/collector', collectorRouter);
 router.use('/webhooks', webhooksRouter);
 router.get('/sellers', listSellersHandler);
 

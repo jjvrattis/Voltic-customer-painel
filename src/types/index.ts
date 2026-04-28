@@ -38,6 +38,43 @@ export interface Collector {
   name: string;
   phone: string;
   active: boolean;
+  pin_hash?: string | null;
+  session_token?: string | null;
+  cep_zones?: string[];
+}
+
+export interface CollectorAssignment {
+  id: string;
+  collector_id: string;
+  seller_id: string;
+  days_of_week: number[];
+  active: boolean;
+  created_at: string;
+}
+
+export type ScanType = 'pickup' | 'hub_arrival' | 'delivery_pickup' | 'delivered';
+
+export interface Scan {
+  id: string;
+  collector_id: string;
+  tracking_code: string;
+  scan_type: ScanType;
+  order_id: string | null;
+  collection_request_id: string | null;
+  lat: number | null;
+  lng: number | null;
+  scanned_at: string;
+}
+
+export interface Delivery {
+  id: string;
+  order_id: string;
+  collector_id: string;
+  recipient_name: string | null;
+  recipient_document: string | null;
+  photo_url: string | null;
+  notes: string | null;
+  delivered_at: string;
 }
 
 export interface ApiResponse<T = unknown> {
