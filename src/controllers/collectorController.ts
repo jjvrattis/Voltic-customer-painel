@@ -287,6 +287,58 @@ export async function completeDelivery(
   }
 }
 
+// ── Perfil do coletor ────────────────────────────────────────────────────────
+
+export async function getCollectorProfile(
+  req: Request, res: Response, next: NextFunction,
+): Promise<void> {
+  try {
+    const { data, error } = await supabase
+      .from('collectors')
+      .select('id, name, phone, phone_contact, cpf, bank_name, bank_agency, bank_account, pix_key, photo_url, cep_zones')
+      .eq('id', req.collectorId!)
+      .single();
+    if (error) throw new AppError(500, error.message);
+    res.json({ success: true, data } satisfies ApiResponse);
+  } catch (err) { next(err); }
+}
+
+export async function updateCollectorProfile(
+  req: Request, res: Response, next: NextFunction,
+): Promise<void> {
+  try {
+    const { name, phone_contact, cpf, bank_name, bank_agency, bank_account, pix_key, photo_url } =
+      req.body as {
+        name?: string; phone_contact?: string; cpf?: string;
+        bank_name?: string; bank_agency?: string; bank_account?: string;
+        pix_key?: string; photo_url?: string;
+      };
+
+    const update: Record<string, unknown> = {};
+    if (name         !== undefined) update['name']          = name.trim();
+    if (phone_contact!== undefined) update['phone_contact'] = phone_contact.trim();
+    if (cpf          !== undefined) update['cpf']           = cpf.replace(/\D/g, '');
+    if (bank_name    !== undefined) update['bank_name']     = bank_name.trim();
+    if (bank_agency  !== undefined) update['bank_agency']   = bank_agency.trim();
+    if (bank_account !== undefined) update['bank_account']  = bank_account.trim();
+    if (pix_key      !== undefined) update['pix_key']       = pix_key.trim();
+    if (photo_url    !== undefined) update['photo_url']     = photo_url;
+
+    if (Object.keys(update).length === 0) {
+      res.json({ success: true } satisfies ApiResponse);
+      return;
+    }
+
+    const { error } = await supabase
+      .from('collectors')
+      .update(update)
+      .eq('id', req.collectorId!);
+    if (error) throw new AppError(500, error.message);
+
+    res.json({ success: true } satisfies ApiResponse);
+  } catch (err) { next(err); }
+}
+
 // ── Histórico ────────────────────────────────────────────────────────────────
 
 export async function scanHistory(
