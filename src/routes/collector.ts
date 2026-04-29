@@ -7,6 +7,8 @@ import {
   todayDeliveries,
   completeDelivery,
   scanHistory,
+  getCollectorProfile,
+  updateCollectorProfile,
 } from '../controllers/collectorController';
 
 const router = Router();
@@ -22,5 +24,8 @@ router.get(  '/deliveries/today',          todayDeliveries);
 router.post( '/deliveries/:id/complete',   completeDelivery);
 
 router.get(  '/scans/history',             scanHistory);
+
+router.get(  '/profile',                   getCollectorProfile);
+router.patch('/profile',                   updateCollectorProfile);
 
 export default router;
