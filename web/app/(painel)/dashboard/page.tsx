@@ -1,4 +1,5 @@
 import { getOrders, Order } from '@/lib/api';
+import AdminMetricsStrip from '@/components/AdminMetricsStrip';
 
 export const dynamic = 'force-dynamic';
 
@@ -247,6 +248,9 @@ export default async function DashboardPage() {
           </span>
         </div>
       </div>
+
+      {/* ── Métricas globais (lojistas, coletores, entregas) ── */}
+      <AdminMetricsStrip />
 
       {/* ── Stat cards ──────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
