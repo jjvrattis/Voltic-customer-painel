@@ -189,3 +189,102 @@ export async function syncShopee(
 export async function getConnectedSellers(): Promise<SellerToken[]> {
   return apiFetch<SellerToken[]>('/sellers');
 }
+
+// ─── Admin API ────────────────────────────────────────────────────────────────
+
+async function adminFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = getAdminToken();
+  const res = await fetch(`${API_BASE}/api/v1/admin${path}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    ...options,
+  });
+  const json: ApiResponse<T> = await res.json();
+  if (!json.success || !res.ok) throw new Error(json.error ?? `Erro ${res.status}`);
+  return json.data as T;
+}
+
+export interface AdminMetrics {
+  sellers:   { total: number };
+  collectors:{ total: number; active: number };
+  orders_today: {
+    total: number; ready_to_ship: number;
+    collected: number; shipped: number; delivered: number;
+  };
+  deliveries_today: number;
+  pending_billing_cents: number;
+}
+
+export interface AdminSeller {
+  seller_id:       string;
+  email:           string;
+  created_at:      string;
+  total_orders:    number;
+  last_collection: string | null;
+  profile: {
+    name: string | null;
+    phone: string | null;
+    city: string | null;
+    state: string | null;
+  } | null;
+  credit: {
+    credit_limit: number;
+    credit_used:  number;
+    cycle_start:  string;
+    cycle_end:    string;
+  } | null;
+}
+
+export interface AdminCollector {
+  id:            string;
+  name:          string;
+  phone:         string;
+  active:        boolean;
+  cep_zones:     string[];
+  created_at:    string;
+  last_delivery: string | null;
+  total_scans:   number;
+}
+
+export function getAdminMetrics(): Promise<AdminMetrics> {
+  return adminFetch<AdminMetrics>('/metrics');
+}
+
+export function getAdminSellers(): Promise<{ sellers: AdminSeller[] }> {
+  return adminFetch<{ sellers: AdminSeller[] }>('/sellers');
+}
+
+export function updateSellerCredit(
+  sellerId: string,
+  payload: { credit_limit?: number; reset_cycle?: boolean },
+): Promise<void> {
+  return adminFetch<void>(`/sellers/${sellerId}/credit`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getAdminCollectors(): Promise<{ collectors: AdminCollector[] }> {
+  return adminFetch<{ collectors: AdminCollector[] }>('/collectors');
+}
+
+export function createAdminCollector(payload: {
+  name: string; phone: string; pin: string; cep_zones?: string[];
+}): Promise<AdminCollector> {
+  return adminFetch<AdminCollector>('/collectors', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateAdminCollector(
+  collectorId: string,
+  payload: { name?: string; phone?: string; pin?: string; active?: boolean; cep_zones?: string[] },
+): Promise<void> {
+  return adminFetch<void>(`/collectors/${collectorId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
