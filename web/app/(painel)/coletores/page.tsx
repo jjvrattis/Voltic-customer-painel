@@ -50,12 +50,12 @@ function CollectorModal({
     }
   }
 
-  const fields = [
+  const fields: { label: string; val: string; set: (v: string) => void; full?: boolean }[] = [
     { label: 'Nome completo', val: name, set: setName, full: true },
     { label: 'Telefone (somente números)', val: phone, set: setPhone },
     { label: isNew ? 'PIN (4 dígitos, obrigatório)' : 'PIN (deixe vazio para manter)', val: pin, set: setPin },
     { label: 'Zonas CEP (ex: 028, 011)', val: zones, set: setZones },
-  ] as const;
+  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)' }}>
@@ -76,7 +76,7 @@ function CollectorModal({
               <input
                 type="text"
                 value={val}
-                onChange={e => (set as (v: string) => void)(e.target.value)}
+                onChange={e => set(e.target.value)}
                 className="w-full rounded-xl px-3 py-2.5 text-sm font-body text-white outline-none"
                 style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(147,51,234,0.25)' }}
               />
