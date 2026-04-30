@@ -50,12 +50,10 @@ function CollectorModal({
     }
   }
 
-  const fields: { label: string; val: string; set: (v: string) => void; full?: boolean }[] = [
-    { label: 'Nome completo', val: name, set: setName, full: true },
-    { label: 'Telefone (somente números)', val: phone, set: setPhone },
-    { label: isNew ? 'PIN (4 dígitos, obrigatório)' : 'PIN (deixe vazio para manter)', val: pin, set: setPin },
-    { label: 'Zonas CEP (ex: 028, 011)', val: zones, set: setZones },
-  ];
+  const inputCls = 'w-full rounded-xl px-3 py-2.5 text-sm font-body text-white outline-none';
+  const inputSty = { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(147,51,234,0.25)' };
+  const labelCls = 'text-[10px] font-body uppercase tracking-wider';
+  const labelSty = { color: 'rgba(255,255,255,0.35)' };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)' }}>
@@ -70,18 +68,22 @@ function CollectorModal({
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          {fields.map(({ label, val, set, full }) => (
-            <div key={label} className={`space-y-1 ${full ? 'col-span-2' : ''}`}>
-              <label className="text-[10px] font-body uppercase tracking-wider" style={{ color: 'rgba(255,255,255,0.35)' }}>{label}</label>
-              <input
-                type="text"
-                value={val}
-                onChange={e => set(e.target.value)}
-                className="w-full rounded-xl px-3 py-2.5 text-sm font-body text-white outline-none"
-                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(147,51,234,0.25)' }}
-              />
-            </div>
-          ))}
+          <div className="col-span-2 space-y-1">
+            <label className={labelCls} style={labelSty}>Nome completo</label>
+            <input className={inputCls} style={inputSty} value={name} onChange={e => setName(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <label className={labelCls} style={labelSty}>Telefone</label>
+            <input className={inputCls} style={inputSty} value={phone} onChange={e => setPhone(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <label className={labelCls} style={labelSty}>{isNew ? 'PIN (4 dígitos)' : 'PIN (vazio = manter)'}</label>
+            <input className={inputCls} style={inputSty} value={pin} onChange={e => setPin(e.target.value)} maxLength={4} />
+          </div>
+          <div className="col-span-2 space-y-1">
+            <label className={labelCls} style={labelSty}>Zonas CEP (ex: 028, 011)</label>
+            <input className={inputCls} style={inputSty} value={zones} onChange={e => setZones(e.target.value)} />
+          </div>
         </div>
 
         {!isNew && (
