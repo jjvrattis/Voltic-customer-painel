@@ -266,20 +266,40 @@ export async function mlCallback(
     }
 
     const token = await exchangeMLCode(code);
-    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3001';
-    const inviteToken = typeof state === 'string' ? state : null;
+    const inviteToken = typeof state === 'string' && state.length > 0 ? state : null;
 
-    // Se veio de um invite de onboarding, marcar como conectado e notificar
-    if (inviteToken) {
+    // Se veio de um invite de onboarding legado, marcar como conectado
+    if (inviteToken && inviteToken.length < 50) {
+      // state é um token de invite (formato antigo)
       await markInviteConnected(inviteToken, token.seller_id);
       await notifyAdminWhatsApp(token.seller_id);
-      // Redireciona para o cadastro do seller para ele criar email/senha
-      res.redirect(`${frontendUrl}/register?invite=${inviteToken}`);
-      return;
     }
 
-    // Fluxo direto (sem invite) — redireciona para /conectar com banner de sucesso
-    res.redirect(`${frontendUrl}/conectar?success=ml`);
+    // Retorna página de sucesso — o app mobile detecta a URL do callback e fecha o browser
+    // O app faz polling para verificar a integração (openAuthSessionAsync + getIntegrations)
+    res.send(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Voltic — Conectado!</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #06040F; color: #fff;
+           display: flex; align-items: center; justify-content: center;
+           min-height: 100vh; margin: 0; text-align: center; padding: 24px; }
+    .icon { font-size: 64px; margin-bottom: 16px; }
+    h1 { color: #FFD700; font-size: 24px; margin: 0 0 8px; }
+    p  { color: rgba(255,255,255,0.5); font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="icon">✅</div>
+    <h1>Mercado Livre conectado!</h1>
+    <p>Você pode fechar esta janela e voltar para o app Voltic.</p>
+  </div>
+</body>
+</html>`);
   } catch (err) {
     next(err);
   }
