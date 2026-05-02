@@ -339,6 +339,45 @@ export async function updateCollectorProfile(
   } catch (err) { next(err); }
 }
 
+// ── Localização em tempo real ────────────────────────────────────────────────
+
+export async function updateLocation(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const collectorId = req.collectorId!;
+    const { lat, lng, heading, speed, is_active } = req.body as {
+      lat?: number; lng?: number;
+      heading?: number; speed?: number;
+      is_active?: boolean;
+    };
+
+    if (lat === undefined || lng === undefined) {
+      throw new AppError(400, 'lat e lng são obrigatórios');
+    }
+
+    const { error } = await supabase
+      .from('collector_locations')
+      .upsert({
+        collector_id: collectorId,
+        lat,
+        lng,
+        heading:   heading  ?? null,
+        speed:     speed    ?? null,
+        is_active: is_active !== false,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'collector_id' });
+
+    if (error) throw new AppError(500, error.message);
+
+    res.json({ success: true } satisfies ApiResponse);
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ── Histórico ────────────────────────────────────────────────────────────────
 
 export async function scanHistory(
