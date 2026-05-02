@@ -4,6 +4,60 @@ import { supabase } from '../lib/supabase';
 import { AppError } from '../middlewares/errorHandler';
 import { ApiResponse } from '../types';
 
+// ── Mapa ao vivo ─────────────────────────────────────────────────────────────
+
+export async function getLiveMap(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { data: locations, error } = await supabase
+      .from('collector_locations')
+      .select('collector_id, lat, lng, heading, speed, is_active, updated_at')
+      .eq('is_active', true)
+      .gte('updated_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()); // últimos 5min
+
+    if (error) throw new AppError(500, error.message);
+
+    const ids = (locations ?? []).map(l => l.collector_id as string);
+
+    const { data: collectors } = await supabase
+      .from('collectors')
+      .select('id, name, cep_zones')
+      .in('id', ids);
+
+    const collectorMap = new Map((collectors ?? []).map(c => [c.id, c]));
+
+    // Quantos pedidos cada coletor está entregando hoje
+    const { data: deliveriesInProgress } = await supabase
+      .from('orders')
+      .select('collector_id')
+      .eq('status', 'shipped')
+      .in('collector_id', ids);
+
+    const packageCount = new Map<string, number>();
+    for (const d of (deliveriesInProgress ?? [])) {
+      packageCount.set(d.collector_id as string, (packageCount.get(d.collector_id as string) ?? 0) + 1);
+    }
+
+    const pins = (locations ?? []).map(l => ({
+      collector_id: l.collector_id,
+      lat:          l.lat,
+      lng:          l.lng,
+      heading:      l.heading,
+      speed:        l.speed,
+      updated_at:   l.updated_at,
+      name:         collectorMap.get(l.collector_id as string)?.name ?? '—',
+      packages:     packageCount.get(l.collector_id as string) ?? 0,
+    }));
+
+    res.json({ success: true, data: { pins } } satisfies ApiResponse);
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ── Métricas gerais ──────────────────────────────────────────────────────────
 
 export async function getAdminMetrics(

@@ -9,6 +9,7 @@ import {
   scanHistory,
   getCollectorProfile,
   updateCollectorProfile,
+  updateLocation,
 } from '../controllers/collectorController';
 
 const router = Router();
@@ -24,6 +25,7 @@ router.get(  '/deliveries/today',          todayDeliveries);
 router.post( '/deliveries/:id/complete',   completeDelivery);
 
 router.get(  '/scans/history',             scanHistory);
+router.patch('/location',                  updateLocation);
 
 router.get(  '/profile',                   getCollectorProfile);
 router.patch('/profile',                   updateCollectorProfile);
