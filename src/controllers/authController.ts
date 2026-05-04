@@ -266,19 +266,22 @@ export async function mlCallback(
     }
 
     const mlToken     = await exchangeMLCode(code);
-    const inviteToken = typeof state === 'string' && state.length > 0 ? state : null;
+    const stateParam  = typeof state === 'string' ? state : '';
     const frontendUrl = process.env.FRONTEND_URL ?? 'https://admin.expressvoltic.com.br';
 
-    // Se veio de um invite de onboarding, marcar como conectado e notificar
-    if (inviteToken) {
-      await markInviteConnected(inviteToken, mlToken.seller_id);
+    // Invite tokens são hex de 32 chars sem hífens (ex: 2257705dcd192ec0...)
+    // Seller IDs são UUIDs com hífens (ex: 210604275 ou uuid-format)
+    // Se o state tem hífens ou é numérico → veio do app mobile → retorna HTML e fecha
+    const isInviteToken = /^[0-9a-f]{24,}$/.test(stateParam) && !stateParam.includes('-');
+
+    if (isInviteToken) {
+      await markInviteConnected(stateParam, mlToken.seller_id);
       await notifyAdminWhatsApp(mlToken.seller_id);
-      // Redireciona de volta para a página de onboarding (mostra "Tudo pronto!")
-      res.redirect(`${frontendUrl}/onboarding/${inviteToken}`);
+      res.redirect(`${frontendUrl}/onboarding/${stateParam}`);
       return;
     }
 
-    // Fluxo do app mobile (sem invite) — retorna página de sucesso simples
+    // Fluxo do app mobile — retorna página de sucesso simples
     // openAuthSessionAsync detecta a URL do callback e fecha o browser automaticamente
     res.send(`<!DOCTYPE html>
 <html lang="pt-BR">
