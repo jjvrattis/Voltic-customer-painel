@@ -22,7 +22,7 @@ export async function createInviteHandler(
 
     const invite = await createInvite(sellerName.trim(), sellerPhone?.trim());
 
-    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3001';
+    const frontendUrl = process.env.FRONTEND_URL ?? 'https://admin.expressvoltic.com.br';
     const link = `${frontendUrl}/onboarding/${invite.token}`;
 
     const body: ApiResponse = {
