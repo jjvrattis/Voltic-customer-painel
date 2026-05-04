@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import { getAdminToken } from '@/lib/api';
 
 interface Pin {
@@ -151,16 +150,16 @@ export default function LiveMap() {
     }
 
     // Remove marcadores de coletores que saíram
-    for (const [id, marker] of markersRef.current.entries()) {
+    Array.from(markersRef.current.entries()).forEach(([id, marker]) => {
       if (!seenIds.has(id)) {
         marker.remove();
         markersRef.current.delete(id);
       }
-    }
+    });
 
     // Se há pins, centralizar no grupo
     if (pins.length > 0 && markersRef.current.size > 0) {
-      const group = L.featureGroup([...markersRef.current.values()]);
+      const group = L.featureGroup(Array.from(markersRef.current.values()));
       map.fitBounds(group.getBounds().pad(0.3));
     }
   }, [pins]);
