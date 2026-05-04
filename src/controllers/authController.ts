@@ -265,18 +265,21 @@ export async function mlCallback(
       throw new AppError(400, 'Missing authorization code');
     }
 
-    const token = await exchangeMLCode(code);
+    const mlToken     = await exchangeMLCode(code);
     const inviteToken = typeof state === 'string' && state.length > 0 ? state : null;
+    const frontendUrl = process.env.FRONTEND_URL ?? 'https://admin.expressvoltic.com.br';
 
-    // Se veio de um invite de onboarding legado, marcar como conectado
-    if (inviteToken && inviteToken.length < 50) {
-      // state é um token de invite (formato antigo)
-      await markInviteConnected(inviteToken, token.seller_id);
-      await notifyAdminWhatsApp(token.seller_id);
+    // Se veio de um invite de onboarding, marcar como conectado e notificar
+    if (inviteToken) {
+      await markInviteConnected(inviteToken, mlToken.seller_id);
+      await notifyAdminWhatsApp(mlToken.seller_id);
+      // Redireciona de volta para a página de onboarding (mostra "Tudo pronto!")
+      res.redirect(`${frontendUrl}/onboarding/${inviteToken}`);
+      return;
     }
 
-    // Retorna página de sucesso — o app mobile detecta a URL do callback e fecha o browser
-    // O app faz polling para verificar a integração (openAuthSessionAsync + getIntegrations)
+    // Fluxo do app mobile (sem invite) — retorna página de sucesso simples
+    // openAuthSessionAsync detecta a URL do callback e fecha o browser automaticamente
     res.send(`<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -296,7 +299,7 @@ export async function mlCallback(
   <div>
     <div class="icon">✅</div>
     <h1>Mercado Livre conectado!</h1>
-    <p>Você pode fechar esta janela e voltar para o app Voltic.</p>
+    <p>Pode fechar esta janela e voltar para o app Voltic.</p>
   </div>
 </body>
 </html>`);
