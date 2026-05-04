@@ -37,6 +37,7 @@ export default function RootLayout({
         <meta name="theme-color" content="#06040F" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <script dangerouslySetInnerHTML={{
           __html: `if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');`
         }} />
