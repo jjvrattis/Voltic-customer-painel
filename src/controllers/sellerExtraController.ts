@@ -12,6 +12,7 @@ import {
   getProprioOrder,
   cancelProprioOrder,
   getProprioLabelHtml,
+  getHubQrHtml,
   runRecurringCollections,
   getOrderDetailService,
 } from '../services/sellerExtraService';
@@ -145,7 +146,26 @@ export async function proprioLabelHandler(
     const id = req.params['id'];
     if (!id || typeof id !== 'string') throw new AppError(400, 'id obrigatório');
     const html = await getProprioLabelHtml(req.sellerId!, id);
+    // Se query param ?print=1 retorna HTML direto para impressão
+    if (req.query['print'] === '1') {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(html);
+      return;
+    }
     res.json({ success: true, data: { html } });
+  } catch (err) { next(err); }
+}
+
+// ─── Hub QR Code (admin/público) ─────────────────────────────────────────────
+
+export async function hubQrHandler(
+  req: Request, res: Response, next: NextFunction,
+): Promise<void> {
+  try {
+    const hubId = typeof req.query['hub'] === 'string' ? req.query['hub'].toUpperCase() : 'SP01';
+    const html  = await getHubQrHtml(hubId);
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
   } catch (err) { next(err); }
 }
 

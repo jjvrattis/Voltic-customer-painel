@@ -25,6 +25,7 @@ import {
   cancelProprioHandler,
   orderDetailHandler,
   proprioLabelHandler,
+  hubQrHandler,
 } from '../controllers/sellerExtraController';
 
 const router = Router();
@@ -79,5 +80,8 @@ router.get('/orders/proprio/:id',        getProprioHandler);
 router.delete('/orders/proprio/:id',     cancelProprioHandler);
 router.get('/orders/proprio/:id/label',  proprioLabelHandler);
 router.get('/orders/:orderId',            orderDetailHandler);
+
+// Hub QR Code — imprimível
+router.get('/hub-qr',                     hubQrHandler);
 
 export default router;

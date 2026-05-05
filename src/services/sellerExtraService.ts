@@ -253,22 +253,69 @@ export async function getIntegrations(sellerId: string): Promise<{ ml: boolean; 
 
 // ─── Pedidos Próprios ─────────────────────────────────────────────────────────
 
+// ── Gera código de rastreio único VLTC-XXXXXXXX ──────────────────────────────
+function generateTrackingCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sem I, O, 0, 1 (confusos visualmente)
+  let code = 'VLTC-';
+  for (let i = 0; i < 8; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
 export async function createProprioOrder(
   sellerId: string,
-  payload: Omit<ProprioOrder, 'id' | 'seller_id' | 'status' | 'collection_id' | 'created_at' | 'collected_at' | 'delivered_at'>,
+  payload: Omit<ProprioOrder, 'id' | 'seller_id' | 'status' | 'collection_id' | 'created_at' | 'collected_at' | 'delivered_at' | 'tracking_number'>,
 ): Promise<ProprioOrder> {
   if (!payload.recipient_name || !payload.recipient_phone || !payload.dest_cep || !payload.dest_street || !payload.dest_number || !payload.dest_city || !payload.dest_state) {
     throw new AppError(400, 'Dados do destinatário incompletos');
   }
 
+  // Gera tracking code único (retry se colidir)
+  let tracking_number = '';
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const candidate = generateTrackingCode();
+    const { data: existing } = await supabase
+      .from('proprio_orders')
+      .select('id')
+      .eq('tracking_number', candidate)
+      .maybeSingle();
+    if (!existing) { tracking_number = candidate; break; }
+  }
+  if (!tracking_number) throw new AppError(500, 'Falha ao gerar código de rastreio');
+
   const { data, error } = await supabase
     .from('proprio_orders')
-    .insert({ ...payload, seller_id: sellerId })
+    .insert({ ...payload, seller_id: sellerId, tracking_number })
     .select()
     .single();
 
   if (error || !data) throw new AppError(500, `Erro ao criar pedido: ${error?.message}`);
-  return data as ProprioOrder;
+
+  const order = data as ProprioOrder;
+
+  // Cria entrada em orders para aparecer no fluxo do entregador
+  await supabase.from('orders').insert({
+    seller_id:          sellerId,
+    platform:           'proprio' as never,
+    external_order_id:  tracking_number,
+    tracking_number:    tracking_number,
+    status:             'ready_to_ship',
+    delivery_cep:       payload.dest_cep.replace(/\D/g, '').slice(0, 5),
+    raw_payload: {
+      proprio_order_id: order.id,
+      recipient_name:   payload.recipient_name,
+      recipient_phone:  payload.recipient_phone,
+      address: {
+        full_address: `${payload.dest_street}, ${payload.dest_number}`,
+        complement:   payload.dest_complement ?? null,
+        neighborhood: payload.dest_neighborhood ?? null,
+        city:         payload.dest_city,
+        state:        payload.dest_state,
+        zip_code:     payload.dest_cep,
+      },
+    },
+  });
+
+  return order;
 }
 
 export async function listProprioOrders(sellerId: string, status?: string): Promise<ProprioOrder[]> {
@@ -311,9 +358,15 @@ export async function cancelProprioOrder(sellerId: string, orderId: string): Pro
   if (error) throw new AppError(500, `Erro ao cancelar: ${error.message}`);
 }
 
-// ─── Etiqueta HTML ────────────────────────────────────────────────────────────
+// ─── Etiqueta HTML (80mm — impressora térmica) ────────────────────────────────
+
+function esc(s: string | null | undefined): string {
+  return (s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
 export async function getProprioLabelHtml(sellerId: string, orderId: string): Promise<string> {
+  const QRCode = (await import('qrcode')).default;
+
   const order = await getProprioOrder(sellerId, orderId);
 
   const { data: profile } = await supabase
@@ -322,47 +375,93 @@ export async function getProprioLabelHtml(sellerId: string, orderId: string): Pr
     .eq('seller_id', sellerId)
     .single();
 
-  const trackingCode = `VLT-${order.id.slice(0, 8).toUpperCase()}`;
-  const senderName   = profile?.name ?? 'Remetente';
-  const senderAddr   = profile
-    ? `${profile.street}, ${profile.street_number} — ${profile.neighborhood ?? ''} ${profile.city}/${profile.state} CEP ${profile.cep ?? ''}`
+  const trackingCode = (order as ProprioOrder & { tracking_number?: string }).tracking_number
+    ?? `VLTC-${order.id.slice(0,8).toUpperCase()}`;
+
+  const qrSvg      = await QRCode.toString(trackingCode, { type: 'svg', width: 200, margin: 1 });
+  const senderName = esc(profile?.name ?? 'Remetente');
+  const senderAddr = profile
+    ? esc(`${profile.street}, ${profile.street_number} — ${profile.neighborhood ?? ''} ${profile.city}/${profile.state}`)
     : '';
 
   return `<!doctype html>
 <html><head><meta charset="utf-8"><style>
-  @page { size: 100mm 150mm; margin: 0; }
-  body { font-family: -apple-system, sans-serif; margin: 0; padding: 8mm; color: #000; }
-  .header { border-bottom: 2px solid #000; padding-bottom: 6px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
-  .brand { font-weight: 800; font-size: 18px; letter-spacing: 3px; }
-  .tracking { font-family: monospace; font-weight: 700; font-size: 14px; }
-  .section { margin: 10px 0; }
-  .label { font-size: 9px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 1px; }
-  .value { font-size: 12px; margin-top: 2px; line-height: 1.4; }
-  .recipient { border: 2px solid #000; padding: 8px; border-radius: 4px; margin-top: 10px; }
-  .recipient .value { font-size: 14px; font-weight: 600; }
-  .footer { font-size: 8px; color: #888; margin-top: 12px; text-align: center; }
+  @page { size: 80mm auto; margin: 0; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 11px; margin: 0; padding: 4mm; color: #000;
+    width: 80mm;
+  }
+  .top { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 6px; }
+  .brand { font-weight: 900; font-size: 22px; letter-spacing: 4px; }
+  .qr { width: 28mm; height: 28mm; }
+  .qr svg { width: 100%; height: 100%; }
+  .tracking { font-size: 13px; font-weight: 700; letter-spacing: 2px; text-align: center; border: 2px solid #000; padding: 3px 6px; margin-bottom: 6px; }
+  .block { margin-bottom: 6px; }
+  .lbl { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #555; }
+  .val { font-size: 11px; line-height: 1.4; margin-top: 1px; }
+  .dest-box { border: 2px solid #000; padding: 5px; margin-bottom: 6px; }
+  .dest-name { font-size: 14px; font-weight: 700; }
+  .divider { border-top: 1px dashed #999; margin: 5px 0; }
+  .footer { font-size: 8px; text-align: center; color: #888; margin-top: 4px; }
+  @media print { body { padding: 2mm; } }
 </style></head><body>
-  <div class="header">
-    <div class="brand">VOLTIC</div>
-    <div class="tracking">${trackingCode}</div>
+
+  <div class="top">
+    <span class="brand">VOLTIC</span>
+    <div class="qr">${qrSvg}</div>
   </div>
-  <div class="section">
-    <div class="label">Remetente</div>
-    <div class="value">${senderName}<br/>${senderAddr}</div>
+
+  <div class="tracking">${esc(trackingCode)}</div>
+
+  <div class="block">
+    <div class="lbl">Remetente</div>
+    <div class="val">${senderName}<br/>${senderAddr}</div>
   </div>
-  <div class="recipient">
-    <div class="label">Destinatário</div>
-    <div class="value">
-      <strong>${order.recipient_name}</strong><br/>
-      ${order.dest_street}, ${order.dest_number}${order.dest_complement ? ' — ' + order.dest_complement : ''}<br/>
-      ${order.dest_neighborhood ? order.dest_neighborhood + ' — ' : ''}${order.dest_city}/${order.dest_state}<br/>
-      CEP ${order.dest_cep}<br/>
-      Tel ${order.recipient_phone}
+
+  <div class="divider"></div>
+
+  <div class="dest-box">
+    <div class="lbl">Destinatário</div>
+    <div class="dest-name">${esc(order.recipient_name)}</div>
+    <div class="val">
+      ${esc(order.dest_street)}, ${esc(order.dest_number)}${order.dest_complement ? ' — ' + esc(order.dest_complement) : ''}<br/>
+      ${order.dest_neighborhood ? esc(order.dest_neighborhood) + ' — ' : ''}${esc(order.dest_city)}/${esc(order.dest_state)}<br/>
+      CEP ${esc(order.dest_cep)}<br/>
+      Tel ${esc(order.recipient_phone)}
     </div>
   </div>
-  ${order.weight_grams ? `<div class="section"><span class="label">Peso</span> <span class="value">${order.weight_grams}g</span></div>` : ''}
-  ${order.notes ? `<div class="section"><div class="label">Obs</div><div class="value">${order.notes}</div></div>` : ''}
-  <div class="footer">Coleta e entrega Voltic — Última Milha</div>
+
+  ${order.weight_grams ? `<div class="block"><span class="lbl">Peso: </span><span class="val">${order.weight_grams}g</span></div>` : ''}
+  ${order.notes ? `<div class="block"><div class="lbl">Obs</div><div class="val">${esc(order.notes)}</div></div>` : ''}
+
+  <div class="footer">Coleta e entrega Voltic Logística — Última Milha</div>
+</body></html>`;
+}
+
+// ─── QR Code do Hub (estático, imprimir e colar na parede) ───────────────────
+
+export async function getHubQrHtml(hubId = 'SP01'): Promise<string> {
+  const QRCode  = (await import('qrcode')).default;
+  const hubCode = `VLTC-HUB-${hubId}`;
+  const qrSvg   = await QRCode.toString(hubCode, { type: 'svg', width: 300, margin: 2 });
+
+  return `<!doctype html>
+<html><head><meta charset="utf-8"><style>
+  @page { size: A4; margin: 20mm; }
+  body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; }
+  .qr svg { width: 200px; height: 200px; }
+  h1 { font-size: 32px; letter-spacing: 6px; margin: 12px 0 4px; }
+  h2 { font-size: 18px; letter-spacing: 3px; color: #555; margin: 0; }
+  p  { font-size: 12px; color: #888; margin-top: 16px; text-align: center; max-width: 280px; line-height: 1.6; }
+  .code { font-family: monospace; font-size: 20px; font-weight: 700; letter-spacing: 3px; margin: 8px 0; border: 2px solid #000; padding: 6px 16px; }
+</style></head><body>
+  <h2>VOLTIC LOGÍSTICA</h2>
+  <h1>HUB ${hubId}</h1>
+  <div class="code">${hubCode}</div>
+  <div class="qr">${qrSvg}</div>
+  <p>Bipe este QR code no app do entregador ao chegar ou sair do hub para registrar a movimentação dos pacotes.</p>
 </body></html>`;
 }
 
