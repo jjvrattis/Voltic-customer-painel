@@ -7,6 +7,7 @@ import sellerRouter from './seller';
 import collectorRouter from './collector';
 import webhooksRouter from './webhooks';
 import adminRouter from './admin';
+import { adminAuth } from '../middlewares/adminAuth';
 import { listSellersHandler } from '../controllers/onboardingController';
 import { runRecurringHandler } from '../controllers/sellerExtraController';
 
@@ -24,7 +25,7 @@ router.use('/seller', sellerRouter);
 router.use('/collector', collectorRouter);
 router.use('/webhooks', webhooksRouter);
 router.use('/admin',    adminRouter);
-router.get('/sellers', listSellersHandler);
+router.get('/sellers', adminAuth, listSellersHandler); // requer admin
 
 // Cron — disparado por serviço externo (cron-job.org, etc) com header x-cron-secret
 router.post('/jobs/recurring-collections', runRecurringHandler);

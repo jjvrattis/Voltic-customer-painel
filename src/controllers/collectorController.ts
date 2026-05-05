@@ -339,6 +339,66 @@ export async function updateCollectorProfile(
   } catch (err) { next(err); }
 }
 
+// ── Logout (invalida token no banco) ────────────────────────────────────────
+
+export async function collectorLogout(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    await supabase
+      .from('collectors')
+      .update({ session_token: null })
+      .eq('id', req.collectorId!);
+    res.json({ success: true } satisfies ApiResponse);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── Upload de foto de perfil → Supabase Storage ──────────────────────────────
+
+export async function uploadCollectorPhoto(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { photo_base64, mime_type } = req.body as {
+      photo_base64?: string;
+      mime_type?: string;
+    };
+
+    if (!photo_base64) throw new AppError(400, 'photo_base64 obrigatório');
+
+    const mime    = mime_type ?? 'image/jpeg';
+    const ext     = mime === 'image/png' ? 'png' : 'jpg';
+    const buffer  = Buffer.from(photo_base64, 'base64');
+    const path    = `${req.collectorId!}.${ext}`;
+
+    const { error: uploadErr } = await supabase.storage
+      .from('collector-photos')
+      .upload(path, buffer, { contentType: mime, upsert: true });
+
+    if (uploadErr) throw new AppError(500, `Upload falhou: ${uploadErr.message}`);
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('collector-photos')
+      .getPublicUrl(path);
+
+    // Atualiza photo_url no banco
+    await supabase
+      .from('collectors')
+      .update({ photo_url: publicUrl })
+      .eq('id', req.collectorId!);
+
+    res.json({ success: true, data: { photo_url: publicUrl } } satisfies ApiResponse);
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ── Localização em tempo real ────────────────────────────────────────────────
 
 export async function updateLocation(

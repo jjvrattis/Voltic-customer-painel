@@ -10,6 +10,8 @@ import {
   getCollectorProfile,
   updateCollectorProfile,
   updateLocation,
+  collectorLogout,
+  uploadCollectorPhoto,
 } from '../controllers/collectorController';
 
 const router = Router();
@@ -29,5 +31,7 @@ router.patch('/location',                  updateLocation);
 
 router.get(  '/profile',                   getCollectorProfile);
 router.patch('/profile',                   updateCollectorProfile);
+router.post( '/profile/photo',             uploadCollectorPhoto);
+router.post( '/logout',                    collectorLogout);
 
 export default router;

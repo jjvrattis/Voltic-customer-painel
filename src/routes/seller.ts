@@ -31,6 +31,20 @@ const router = Router();
 
 router.use(sellerAuth);
 
+// Logout — invalida token no banco
+router.post('/logout', async (req, res, next) => {
+  const { supabase } = await import('../lib/supabase');
+  try {
+    const token = req.headers['authorization']?.slice(7);
+    if (token) {
+      await supabase.from('onboarding_invites')
+        .update({ expires_at: new Date().toISOString() })
+        .eq('token', token);
+    }
+    res.json({ success: true });
+  } catch (err) { next(err); }
+});
+
 router.get('/dashboard',          dashboardHandler);
 router.get('/pedidos',            pedidosHandler);
 router.get('/orders/available',   availableOrdersHandler);

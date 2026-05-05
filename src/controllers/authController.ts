@@ -173,6 +173,16 @@ export async function sellerRegister(
 
     if (insertErr) throw new AppError(500, `Erro ao criar conta: ${insertErr.message}`);
 
+    // Garantir que seller_profiles e seller_credits existem (F-07)
+    await supabase.from('seller_profiles').upsert(
+      { seller_id: invite.seller_id, location_type: 'residencia' },
+      { onConflict: 'seller_id', ignoreDuplicates: true },
+    );
+    await supabase.from('seller_credits').upsert(
+      { seller_id: invite.seller_id },
+      { onConflict: 'seller_id', ignoreDuplicates: true },
+    );
+
     const body: ApiResponse<{ token: string; seller_id: string }> = {
       success: true,
       data: { token: invite_token, seller_id: invite.seller_id },
