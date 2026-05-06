@@ -9,13 +9,16 @@ import webhooksRouter from './webhooks';
 import adminRouter from './admin';
 import { adminAuth } from '../middlewares/adminAuth';
 import { listSellersHandler } from '../controllers/onboardingController';
-import { runRecurringHandler } from '../controllers/sellerExtraController';
+import { runRecurringHandler, hubQrHandler } from '../controllers/sellerExtraController';
 
 const router = Router();
 
 router.get('/health', (_req: Request, res: Response) => {
   res.json({ success: true, data: { status: 'ok', timestamp: new Date().toISOString() } });
 });
+
+// Hub QR — público, sem autenticação
+router.get('/hub-qr', hubQrHandler);
 
 router.use('/auth', authRouter);
 router.use('/sync', syncRouter);
