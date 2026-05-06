@@ -333,7 +333,7 @@ export async function createProprioOrder(
         .eq('seller_id', sellerId)
         .single();
 
-      await supabase.from('collection_requests').insert({
+      const { data: newColeta } = await supabase.from('collection_requests').insert({
         seller_id:               sellerId,
         ecommerce_proprio_count: 1,
         ecommerce_count:         0,
@@ -357,10 +357,19 @@ export async function createProprioOrder(
           intercom_code: profile.intercom_code,
           access_notes:  profile.access_notes,
         } : null,
-      });
+      }).select('id').single();
+
+      if (newColeta) {
+        await supabase.from('proprio_orders')
+          .update({ collection_id: newColeta.id })
+          .eq('id', order.id);
+      }
     } else {
-      // Incrementa o contador de próprios na coleta existente
-      await supabase.rpc('increment_proprio_count', { coleta_id: activeColeta.id });
+      // Incrementa o contador e vincula o pedido à coleta existente
+      await Promise.all([
+        supabase.rpc('increment_proprio_count', { coleta_id: activeColeta.id }),
+        supabase.from('proprio_orders').update({ collection_id: activeColeta.id }).eq('id', order.id),
+      ]);
     }
   } catch { /* auto-coleta falhou silenciosamente — seller pode solicitar manualmente */ }
 
