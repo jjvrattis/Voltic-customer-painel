@@ -74,11 +74,14 @@ export async function todayCollections(
       return;
     }
 
+    const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+
     const { data: requests, error: rErr } = await supabase
       .from('collection_requests')
       .select('*')
       .in('seller_id', sellerIds)
-      .in('status', ['pending', 'accepted', 'en_route', 'arrived'])
+      .in('status', ['pending', 'accepted', 'en_route', 'arrived', 'collected'])
+      .gte('requested_at', cutoff)
       .order('requested_at', { ascending: true });
     if (rErr) throw new AppError(500, rErr.message);
 
