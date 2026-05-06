@@ -30,6 +30,9 @@ import {
 
 const router = Router();
 
+// Rotas públicas (antes do sellerAuth)
+router.get('/hub-qr', hubQrHandler);  // QR do hub — imprimível, sem login
+
 router.use(sellerAuth);
 
 // Logout — invalida token no banco
@@ -80,8 +83,5 @@ router.get('/orders/proprio/:id',        getProprioHandler);
 router.delete('/orders/proprio/:id',     cancelProprioHandler);
 router.get('/orders/proprio/:id/label',  proprioLabelHandler);
 router.get('/orders/:orderId',            orderDetailHandler);
-
-// Hub QR Code — imprimível
-router.get('/hub-qr',                     hubQrHandler);
 
 export default router;
