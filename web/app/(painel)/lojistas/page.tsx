@@ -20,12 +20,12 @@ function AssignModal({ seller, onClose }: { seller: AdminSeller; onClose: () => 
   const [saving,       setSaving]       = useState<string | null>(null);
 
   useEffect(() => {
-    void Promise.all([
+    void Promise.allSettled([
       getAdminCollectors(),
       getSellerAssignments(seller.seller_id),
     ]).then(([c, a]) => {
-      setCollectors(c.collectors);
-      setAssignments(a.assignments);
+      if (c.status === 'fulfilled') setCollectors(c.value.collectors);
+      if (a.status === 'fulfilled') setAssignments(a.value.assignments);
     }).finally(() => setLoading(false));
   }, [seller.seller_id]);
 
