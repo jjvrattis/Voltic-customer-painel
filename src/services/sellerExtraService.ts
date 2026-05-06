@@ -315,6 +315,55 @@ export async function createProprioOrder(
     },
   });
 
+  // Auto-coleta: cria collection_request automaticamente se não há nenhuma ativa
+  try {
+    const { data: activeColeta } = await supabase
+      .from('collection_requests')
+      .select('id')
+      .eq('seller_id', sellerId)
+      .in('status', ['pending', 'accepted', 'en_route', 'arrived'])
+      .limit(1)
+      .maybeSingle();
+
+    if (!activeColeta) {
+      // Busca perfil do seller para o endereço de coleta
+      const { data: profile } = await supabase
+        .from('seller_profiles')
+        .select('name, street, street_number, complement, neighborhood, city, state, cep, location_type, floor_unit, doorman_name, intercom_code, access_notes')
+        .eq('seller_id', sellerId)
+        .single();
+
+      await supabase.from('collection_requests').insert({
+        seller_id:               sellerId,
+        ecommerce_proprio_count: 1,
+        ecommerce_count:         0,
+        ml_count:                0,
+        shopee_count:            0,
+        ml_order_ids:            [],
+        shopee_order_ids:        [],
+        time_window:             'qualquer',
+        status:                  'pending',
+        address_snapshot: profile ? {
+          street:        profile.street,
+          street_number: profile.street_number,
+          complement:    profile.complement,
+          neighborhood:  profile.neighborhood,
+          city:          profile.city,
+          state:         profile.state,
+          cep:           profile.cep,
+          location_type: profile.location_type,
+          floor_unit:    profile.floor_unit,
+          doorman_name:  profile.doorman_name,
+          intercom_code: profile.intercom_code,
+          access_notes:  profile.access_notes,
+        } : null,
+      });
+    } else {
+      // Incrementa o contador de próprios na coleta existente
+      await supabase.rpc('increment_proprio_count', { coleta_id: activeColeta.id });
+    }
+  } catch { /* auto-coleta falhou silenciosamente — seller pode solicitar manualmente */ }
+
   return order;
 }
 
