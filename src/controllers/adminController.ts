@@ -238,6 +238,62 @@ export async function updateSellerCredit(
   }
 }
 
+// ── Atribuições coletor ↔ seller ─────────────────────────────────────────────
+
+export async function getSellerAssignments(
+  req: Request, res: Response, next: NextFunction,
+): Promise<void> {
+  try {
+    const { sellerId } = req.params;
+    const { data, error } = await supabase
+      .from('collector_assignments')
+      .select('collector_id, days_of_week, active, collectors(id, name, phone)')
+      .eq('seller_id', sellerId!);
+    if (error) throw new AppError(500, error.message);
+    res.json({ success: true, data: { assignments: data ?? [] } } satisfies ApiResponse);
+  } catch (err) { next(err); }
+}
+
+export async function upsertSellerAssignment(
+  req: Request, res: Response, next: NextFunction,
+): Promise<void> {
+  try {
+    const { sellerId } = req.params;
+    const { collector_id, days_of_week, active } = req.body as {
+      collector_id: string;
+      days_of_week?: number[];
+      active?: boolean;
+    };
+    if (!collector_id) throw new AppError(400, 'collector_id obrigatório');
+
+    const { error } = await supabase
+      .from('collector_assignments')
+      .upsert({
+        seller_id:    sellerId,
+        collector_id,
+        days_of_week: days_of_week ?? [0,1,2,3,4,5,6],
+        active:       active !== false,
+      }, { onConflict: 'seller_id,collector_id' });
+
+    if (error) throw new AppError(500, error.message);
+    res.json({ success: true } satisfies ApiResponse);
+  } catch (err) { next(err); }
+}
+
+export async function removeSellerAssignment(
+  req: Request, res: Response, next: NextFunction,
+): Promise<void> {
+  try {
+    const { sellerId, collectorId } = req.params;
+    await supabase
+      .from('collector_assignments')
+      .delete()
+      .eq('seller_id', sellerId!)
+      .eq('collector_id', collectorId!);
+    res.json({ success: true } satisfies ApiResponse);
+  } catch (err) { next(err); }
+}
+
 // ── Coletores ────────────────────────────────────────────────────────────────
 
 export async function listAdminCollectors(

@@ -266,6 +266,25 @@ export function updateSellerCredit(
   });
 }
 
+export interface SellerAssignment {
+  collector_id: string;
+  days_of_week: number[];
+  active: boolean;
+  collectors: { id: string; name: string; phone: string };
+}
+
+export function getSellerAssignments(sellerId: string): Promise<{ assignments: SellerAssignment[] }> {
+  return adminFetch<{ assignments: SellerAssignment[] }>(`/sellers/${sellerId}/assignments`);
+}
+
+export function upsertSellerAssignment(sellerId: string, payload: { collector_id: string; days_of_week?: number[]; active?: boolean }): Promise<void> {
+  return adminFetch<void>(`/sellers/${sellerId}/assignments`, { method: 'POST', body: JSON.stringify(payload) });
+}
+
+export function removeSellerAssignment(sellerId: string, collectorId: string): Promise<void> {
+  return adminFetch<void>(`/sellers/${sellerId}/assignments/${collectorId}`, { method: 'DELETE' });
+}
+
 export function getAdminCollectors(): Promise<{ collectors: AdminCollector[] }> {
   return adminFetch<{ collectors: AdminCollector[] }>('/collectors');
 }

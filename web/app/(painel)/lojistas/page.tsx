@@ -2,12 +2,108 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import {
-  getAdminSellers, updateSellerCredit,
-  AdminSeller,
+  getAdminSellers, updateSellerCredit, AdminSeller,
+  getAdminCollectors, AdminCollector,
+  getSellerAssignments, upsertSellerAssignment, removeSellerAssignment, SellerAssignment,
 } from '@/lib/api';
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+
+// ─── Modal de Atribuição de Coletor ──────────────────────────────────────────
+
+function AssignModal({ seller, onClose }: { seller: AdminSeller; onClose: () => void }) {
+  const [collectors,   setCollectors]   = useState<AdminCollector[]>([]);
+  const [assignments,  setAssignments]  = useState<SellerAssignment[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [saving,       setSaving]       = useState<string | null>(null);
+
+  useEffect(() => {
+    void Promise.all([
+      getAdminCollectors(),
+      getSellerAssignments(seller.seller_id),
+    ]).then(([c, a]) => {
+      setCollectors(c.collectors);
+      setAssignments(a.assignments);
+    }).finally(() => setLoading(false));
+  }, [seller.seller_id]);
+
+  const isAssigned = (cId: string) => assignments.some(a => a.collector_id === cId && a.active);
+
+  async function toggle(collector: AdminCollector) {
+    setSaving(collector.id);
+    try {
+      if (isAssigned(collector.id)) {
+        await removeSellerAssignment(seller.seller_id, collector.id);
+        setAssignments(prev => prev.filter(a => a.collector_id !== collector.id));
+      } else {
+        await upsertSellerAssignment(seller.seller_id, { collector_id: collector.id });
+        setAssignments(prev => [...prev, { collector_id: collector.id, days_of_week: [0,1,2,3,4,5,6], active: true, collectors: collector }]);
+      }
+    } catch { /* silent */ }
+    finally { setSaving(null); }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)' }}>
+      <div className="w-full max-w-md rounded-3xl p-6 space-y-4" style={{ background: 'rgba(12,10,26,0.97)', border: '1px solid rgba(147,51,234,0.25)', boxShadow: '0 8px 40px rgba(0,0,0,0.6)' }}>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-bold text-white" style={{ fontFamily: 'var(--font-rajdhani)' }}>Atribuir Coletor</h3>
+            <p className="text-[11px] font-body mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>{seller.profile?.name ?? seller.email}</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)' }}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-8"><div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: 'rgba(255,215,0,0.2)', borderTopColor: '#FFD700' }} /></div>
+        ) : collectors.length === 0 ? (
+          <p className="text-center text-sm font-body py-6" style={{ color: 'rgba(255,255,255,0.3)' }}>Nenhum coletor cadastrado</p>
+        ) : (
+          <div className="space-y-2">
+            {collectors.map(c => {
+              const assigned = isAssigned(c.id);
+              const busy = saving === c.id;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => void toggle(c)}
+                  disabled={busy}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl transition-all text-left"
+                  style={{
+                    background: assigned ? 'rgba(34,197,94,0.08)' : 'rgba(255,255,255,0.04)',
+                    border: `1px solid ${assigned ? 'rgba(34,197,94,0.3)' : 'rgba(147,51,234,0.2)'}`,
+                  }}
+                >
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0"
+                    style={{ background: assigned ? 'rgba(34,197,94,0.15)' : 'rgba(147,51,234,0.15)', color: assigned ? '#86EFAC' : '#C084FC', fontFamily: 'var(--font-rajdhani)' }}>
+                    {c.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold font-body" style={{ color: assigned ? '#86EFAC' : '#fff' }}>{c.name}</p>
+                    <p className="text-[10px] font-body" style={{ color: 'rgba(255,255,255,0.35)' }}>{c.phone} · {c.cep_zones.join(', ')}</p>
+                  </div>
+                  {busy ? (
+                    <div className="w-5 h-5 rounded-full border-2 animate-spin shrink-0" style={{ borderColor: 'rgba(255,255,255,0.2)', borderTopColor: '#fff' }} />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0" style={{ borderColor: assigned ? '#22C55E' : 'rgba(255,255,255,0.2)', background: assigned ? '#22C55E' : 'transparent' }}>
+                      {assigned && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <p className="text-[10px] font-body text-center" style={{ color: 'rgba(255,255,255,0.2)' }}>
+          Coletores atribuídos recebem as coletas deste lojista todos os dias
+        </p>
+      </div>
+    </div>
+  );
 }
 
 function CreditModal({
@@ -155,8 +251,9 @@ export default function LojistasPage() {
   const [sellers,  setSellers]  = useState<AdminSeller[]>([]);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState<string | null>(null);
-  const [search,   setSearch]   = useState('');
-  const [editing,  setEditing]  = useState<AdminSeller | null>(null);
+  const [search,    setSearch]    = useState('');
+  const [editing,   setEditing]   = useState<AdminSeller | null>(null);
+  const [assigning, setAssigning] = useState<AdminSeller | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -184,11 +281,10 @@ export default function LojistasPage() {
   return (
     <div className="p-8 max-w-7xl mx-auto">
       {editing && (
-        <CreditModal
-          seller={editing}
-          onClose={() => setEditing(null)}
-          onSaved={() => void load()}
-        />
+        <CreditModal seller={editing} onClose={() => setEditing(null)} onSaved={() => void load()} />
+      )}
+      {assigning && (
+        <AssignModal seller={assigning} onClose={() => setAssigning(null)} />
       )}
 
       {/* Header */}
@@ -305,17 +401,22 @@ export default function LojistasPage() {
                     </td>
                     {/* Ações */}
                     <td className="px-5 py-3.5">
-                      <button
-                        onClick={() => setEditing(s)}
-                        className="px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all hover:opacity-90 font-body"
-                        style={{
-                          background: 'rgba(255,215,0,0.1)',
-                          border: '1px solid rgba(255,215,0,0.25)',
-                          color: '#FFD700',
-                        }}
-                      >
-                        Editar crédito
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setEditing(s)}
+                          className="px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all hover:opacity-90 font-body"
+                          style={{ background: 'rgba(255,215,0,0.1)', border: '1px solid rgba(255,215,0,0.25)', color: '#FFD700' }}
+                        >
+                          Crédito
+                        </button>
+                        <button
+                          onClick={() => setAssigning(s)}
+                          className="px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all hover:opacity-90 font-body"
+                          style={{ background: 'rgba(147,51,234,0.1)', border: '1px solid rgba(147,51,234,0.3)', color: '#C084FC' }}
+                        >
+                          Coletor
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
