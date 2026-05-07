@@ -190,6 +190,11 @@ export async function registerScan(
     if (error) throw new AppError(500, error.message);
 
     if (order) {
+      // Bloqueia re-scan de pedidos já finalizados na fase de entrega
+      if (scan_type === 'delivery_pickup' && ['delivered', 'occurrence'].includes(order.status as string)) {
+        throw new AppError(400, 'Este pedido já foi entregue ou tem ocorrência registrada');
+      }
+
       const newStatus =
         scan_type === 'pickup'           ? 'collected' :
         scan_type === 'hub_arrival'      ? 'collected' :
@@ -521,6 +526,87 @@ export async function createOccurrence(
     if (oErr) throw new AppError(500, oErr.message);
 
     res.json({ success: true } satisfies ApiResponse);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── Relatórios de entregas ────────────────────────────────────────────────────
+// Cursor-based pagination — escalável para milhões de registros.
+// Nunca faz COUNT(*) total; usa delivered_at como cursor.
+
+export async function deliveryReports(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const collectorId = req.collectorId!;
+    const limit       = Math.min(Number(req.query['limit'] ?? 20), 50);
+    const cursor      = req.query['cursor'] as string | undefined; // ISO datetime
+    const dateFrom    = req.query['date_from'] as string | undefined;
+    const dateTo      = req.query['date_to']   as string | undefined;
+    const platform    = req.query['platform']  as string | undefined;
+
+    // ── Histórico de entregas (paginado por cursor) ──────────────────────────
+    let q = supabase
+      .from('deliveries')
+      .select(`
+        id, delivered_at, recipient_name,
+        orders ( id, tracking_number, platform, delivery_cep, raw_payload )
+      `)
+      .eq('collector_id', collectorId)
+      .order('delivered_at', { ascending: false })
+      .limit(limit + 1); // +1 para saber se tem próxima página
+
+    if (cursor) q = q.lt('delivered_at', cursor);
+    if (dateFrom) q = q.gte('delivered_at', dateFrom);
+    if (dateTo)   q = q.lte('delivered_at', dateTo);
+    if (platform) q = (q as any).eq('orders.platform', platform);
+
+    const { data: rows, error: rErr } = await q;
+    if (rErr) throw new AppError(500, rErr.message);
+
+    const hasMore   = (rows ?? []).length > limit;
+    const items     = (rows ?? []).slice(0, limit);
+    const nextCursor = hasMore ? items[items.length - 1]?.delivered_at ?? null : null;
+
+    // ── Stats do período (sem COUNT global — usa apenas o window da query) ───
+    const periodFrom = dateFrom ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const [{ data: statsRows }, { count: occCount }] = await Promise.all([
+      supabase
+        .from('deliveries')
+        .select('orders ( platform )')
+        .eq('collector_id', collectorId)
+        .gte('delivered_at', periodFrom)
+        .limit(5000),
+      supabase
+        .from('delivery_occurrences')
+        .select('id', { count: 'exact', head: true })
+        .eq('collector_id', collectorId)
+        .gte('created_at', periodFrom),
+    ]);
+
+    const platCount: Record<string, number> = {};
+    (statsRows ?? []).forEach((r: any) => {
+      const p = r.orders?.platform ?? 'outros';
+      platCount[p] = (platCount[p] ?? 0) + 1;
+    });
+
+    res.json({
+      success: true,
+      data: {
+        items,
+        next_cursor: nextCursor,
+        has_more:    hasMore,
+        stats: {
+          total:       (statsRows ?? []).length,
+          occurrences: occCount ?? 0,
+          by_platform: platCount,
+        },
+      },
+    } satisfies ApiResponse);
   } catch (err) {
     next(err);
   }
