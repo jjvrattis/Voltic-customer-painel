@@ -146,20 +146,21 @@ export async function calcAmountDue(
   cycleStart: string,
   cycleEnd: string,
 ): Promise<{ amount_cents: number; ml_count: number; shopee_count: number; ecom_count: number }> {
-  // Usa collection_requests coletadas no ciclo como fonte de verdade para cobrança
-  const { data: coletas } = await supabase
-    .from('collection_requests')
-    .select('ml_count, shopee_count, ecommerce_count, ecommerce_proprio_count')
+  // Fonte de verdade: pedidos reais coletados no ciclo (tabela orders)
+  // Evita inflação de collection_requests.ecommerce_proprio_count gerada por testes
+  const { data: ordersInCycle } = await supabase
+    .from('orders')
+    .select('platform')
     .eq('seller_id', sellerId)
-    .eq('status', 'collected')
-    .gte('requested_at', cycleStart + 'T00:00:00.000Z')
-    .lte('requested_at', cycleEnd   + 'T23:59:59.999Z');
+    .in('status', ['collected', 'shipped', 'delivered', 'occurrence'])
+    .gte('collected_at', cycleStart + 'T00:00:00.000Z')
+    .lte('collected_at', cycleEnd   + 'T23:59:59.999Z');
 
   let mlCount = 0, shopeeCount = 0, ecomCount = 0;
-  for (const c of coletas ?? []) {
-    mlCount     += c.ml_count               ?? 0;
-    shopeeCount += c.shopee_count            ?? 0;
-    ecomCount   += (c.ecommerce_count ?? 0) + (c.ecommerce_proprio_count ?? 0);
+  for (const o of ordersInCycle ?? []) {
+    if (o.platform === 'mercadolivre') mlCount++;
+    else if (o.platform === 'shopee')  shopeeCount++;
+    else                               ecomCount++;
   }
 
   const priceMl     = Number(process.env.PRICE_ML_CENTS     ?? 1150);
