@@ -26,6 +26,7 @@ import {
   orderDetailHandler,
   proprioLabelHandler,
   hubQrHandler,
+  ordersMapHandler,
 } from '../controllers/sellerExtraController';
 
 const router = Router();
@@ -80,5 +81,6 @@ router.get('/orders/proprio/:id',        getProprioHandler);
 router.delete('/orders/proprio/:id',     cancelProprioHandler);
 router.get('/orders/proprio/:id/label',  proprioLabelHandler);
 router.get('/orders/:orderId',            orderDetailHandler);
+router.get('/orders/map/pins',            ordersMapHandler);
 
 export default router;

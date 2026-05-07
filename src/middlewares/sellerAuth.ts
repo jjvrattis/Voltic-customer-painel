@@ -24,13 +24,11 @@ export async function sellerAuth(
 
     const { data: invite, error } = await supabase
       .from('onboarding_invites')
-      .select('seller_id, seller_name, status, expires_at')
+      .select('seller_id, seller_name')
       .eq('token', token)
-      .eq('status', 'connected')
       .single();
 
-    if (error || !invite) throw new AppError(401, 'Token inválido ou seller não conectado');
-    if (new Date(invite.expires_at) < new Date()) throw new AppError(401, 'Sessão expirada');
+    if (error || !invite) throw new AppError(401, 'Token inválido');
 
     const sellerId = req.params['id'];
     if (sellerId && invite.seller_id !== sellerId) {
