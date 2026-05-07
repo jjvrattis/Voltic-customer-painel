@@ -7,6 +7,7 @@ import {
   todayDeliveries,
   completeDelivery,
   createOccurrence,
+  createManifest,
   deliveryReports,
   scanHistory,
   getCollectorProfile,
@@ -28,6 +29,7 @@ router.post( '/scans',                     registerScan);
 router.get(  '/deliveries/today',          todayDeliveries);
 router.post( '/deliveries/:id/complete',   completeDelivery);
 router.post( '/deliveries/:id/occurrence', createOccurrence);
+router.post( '/manifests',                 createManifest);
 router.get(  '/reports/deliveries',        deliveryReports);
 
 router.get(  '/scans/history',             scanHistory);

@@ -689,36 +689,64 @@ export async function getCollectionTimeline(
     ? (await supabase.from('collectors').select('name').eq('id', col.agent_id).single()).data?.name ?? null
     : null;
 
-  // Scans desta coleta
-  const { data: scans } = await supabase
-    .from('scans')
-    .select('scan_type, scanned_at')
-    .eq('collection_request_id', collectionId)
-    .order('scanned_at', { ascending: true });
-
-  const hubScan      = scans?.find(s => s.scan_type === 'hub_arrival');
-  const delivPickup  = scans?.find(s => s.scan_type === 'delivery_pickup');
-
-  // Pedidos desta coleta (próprios)
+  // Pedidos desta coleta (próprios + ML via ml_order_ids)
   const { data: proprioOrders } = await supabase
     .from('proprio_orders')
     .select('id, tracking_number, status')
     .eq('collection_id', collectionId);
 
-  // IDs para buscar na orders (ML / Shopee via ml_order_ids)
   const mlIds: string[] = Array.isArray(col.ml_order_ids) ? col.ml_order_ids : [];
   const { data: mlOrders } = mlIds.length > 0
     ? await supabase.from('orders').select('id, tracking_number, platform, status').in('external_order_id', mlIds)
     : { data: [] };
 
-  // Comprovante de entrega do primeiro pedido próprio
-  const proprioIds = (proprioOrders ?? []).map(o => o.id);
-  const { data: deliveries } = proprioIds.length > 0
-    ? await supabase.from('deliveries').select('photo_url, recipient_name, delivered_at').in('order_id', proprioIds).limit(1)
+  // IDs da tabela orders vinculados a esta coleta (próprios via tracking)
+  const proprioTrackings = (proprioOrders ?? []).map(o => o.tracking_number).filter(Boolean);
+  const { data: ordersByTracking } = proprioTrackings.length > 0
+    ? await supabase.from('orders').select('id, tracking_number, platform, status').in('tracking_number', proprioTrackings)
+    : { data: [] };
+  const orderIdsByColeta = (ordersByTracking ?? []).map(o => o.id);
+
+  // Scans: por collection_request_id OU por order_id dos pedidos desta coleta
+  const scansByColId = await supabase
+    .from('scans')
+    .select('scan_type, scanned_at, collection_request_id, order_id')
+    .eq('collection_request_id', collectionId)
+    .order('scanned_at', { ascending: true });
+
+  const scansByOrderId = orderIdsByColeta.length > 0
+    ? await supabase
+        .from('scans')
+        .select('scan_type, scanned_at, collection_request_id, order_id')
+        .in('order_id', orderIdsByColeta)
+        .order('scanned_at', { ascending: true })
+    : { data: [] };
+
+  // Manifesto desta coleta
+  const { data: manifest } = await supabase
+    .from('manifests')
+    .select('id, created_at, package_count')
+    .eq('collection_request_id', collectionId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const allScans = [...(scansByColId.data ?? []), ...(scansByOrderId.data ?? [])];
+  const hubScan     = allScans.find(s => s.scan_type === 'hub_arrival');
+  const delivPickup = allScans.find(s => s.scan_type === 'delivery_pickup');
+
+  // Comprovante de entrega
+  const deliveryOrderIds = [...orderIdsByColeta, ...(mlOrders ?? []).map((o: any) => o.id)];
+  const { data: deliveries } = deliveryOrderIds.length > 0
+    ? await supabase
+        .from('deliveries')
+        .select('id, photo_url, recipient_name, delivered_at, order_id')
+        .in('order_id', deliveryOrderIds)
+        .order('delivered_at', { ascending: false })
+        .limit(1)
     : { data: [] };
   const proof = deliveries?.[0] ?? null;
 
-  // Monta status de entrega
   const allOrders = [
     ...(proprioOrders ?? []).map(o => ({ id: o.id, tracking_number: o.tracking_number, platform: 'proprio', status: o.status as string })),
     ...(mlOrders ?? []).map((o: any) => ({ id: o.id, tracking_number: o.tracking_number, platform: o.platform, status: o.status as string })),
@@ -730,8 +758,9 @@ export async function getCollectionTimeline(
     { type: 'accepted',  label: 'Coletor a caminho',    timestamp: col.accepted_at,   done: !!col.accepted_at  },
     { type: 'arrived',   label: 'Coletor no local',     timestamp: col.arrived_at,    done: !!col.arrived_at   },
     { type: 'collected', label: 'Pacotes coletados',    timestamp: col.collected_at,  done: !!col.collected_at },
-    { type: 'hub',       label: 'Chegou ao Hub Voltic', timestamp: hubScan?.scanned_at ?? null, done: !!hubScan },
-    { type: 'pickup',    label: 'Saiu para entrega',    timestamp: delivPickup?.scanned_at ?? null, done: !!delivPickup },
+    { type: 'hub',      label: 'Chegou ao Hub Voltic', timestamp: hubScan?.scanned_at ?? null, done: !!hubScan },
+    { type: 'manifest', label: 'Manifesto de saída',   timestamp: manifest?.created_at ?? delivPickup?.scanned_at ?? null, done: !!(manifest || delivPickup) },
+    { type: 'pickup',   label: 'Saiu para entrega',    timestamp: delivPickup?.scanned_at ?? null, done: !!delivPickup },
     {
       type: 'delivered', label: 'Entregue',
       timestamp: proof?.delivered_at ?? null,

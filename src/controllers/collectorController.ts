@@ -207,6 +207,21 @@ export async function registerScan(
         if (scan_type === 'delivered') update['delivered_at']  = new Date().toISOString();
         await supabase.from('orders').update(update).eq('id', order.id);
       }
+
+      // Auto-vincula o scan ao collection_request se não foi informado
+      if (!collection_request_id && (scan_type === 'hub_arrival' || scan_type === 'delivery_pickup')) {
+        const { data: colReq } = await supabase
+          .from('collection_requests')
+          .select('id')
+          .eq('agent_id', collectorId)
+          .in('status', ['accepted', 'en_route', 'arrived', 'collected'])
+          .order('collected_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (colReq) {
+          await supabase.from('scans').update({ collection_request_id: colReq.id }).eq('id', scan.id);
+        }
+      }
     }
 
     res.json({ success: true, data: { scan, order_found: !!order } } satisfies ApiResponse);
@@ -620,6 +635,52 @@ export async function deliveryReports(
         },
       },
     } satisfies ApiResponse);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── Manifesto de saída do hub ─────────────────────────────────────────────────
+
+export async function createManifest(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const collectorId = req.collectorId!;
+    const { order_ids, collection_request_id, hub_code } = req.body as {
+      order_ids?: string[];
+      collection_request_id?: string;
+      hub_code?: string;
+    };
+
+    const ids = order_ids ?? [];
+
+    const { data: manifest, error } = await supabase
+      .from('manifests')
+      .insert({
+        collector_id:          collectorId,
+        collection_request_id: collection_request_id ?? null,
+        order_ids:             ids,
+        package_count:         ids.length,
+        hub_code:              hub_code ?? null,
+      })
+      .select()
+      .single();
+
+    if (error) throw new AppError(500, error.message);
+
+    // Marca os pedidos como delivery_pickup registrado
+    if (ids.length > 0) {
+      await supabase
+        .from('orders')
+        .update({ status: 'shipped' as never })
+        .in('id', ids)
+        .eq('status', 'collected');
+    }
+
+    res.json({ success: true, data: { manifest_id: manifest.id, package_count: ids.length } } satisfies ApiResponse);
   } catch (err) {
     next(err);
   }
