@@ -202,27 +202,6 @@ export async function registerScan(
         if (scan_type === 'delivered') update['delivered_at']  = new Date().toISOString();
         await supabase.from('orders').update(update).eq('id', order.id);
       }
-    } else {
-      // VLTC próprio: tracking_number existe em proprio_orders, não em orders
-      const { data: proprio } = await supabase
-        .from('proprio_orders')
-        .select('id, status')
-        .eq('tracking_number', tracking_code)
-        .maybeSingle();
-
-      if (proprio) {
-        const newStatus =
-          scan_type === 'pickup'          ? 'collected' :
-          scan_type === 'delivery_pickup' ? 'shipped'   :
-          scan_type === 'delivered'       ? 'delivered' : null;
-
-        if (newStatus) {
-          const update: Record<string, unknown> = { status: newStatus };
-          if (scan_type === 'pickup')    update['collected_at']  = new Date().toISOString();
-          if (scan_type === 'delivered') update['delivered_at']  = new Date().toISOString();
-          await supabase.from('proprio_orders').update(update).eq('id', proprio.id);
-        }
-      }
     }
 
     res.json({ success: true, data: { scan, order_found: !!order } } satisfies ApiResponse);
@@ -245,52 +224,22 @@ export async function todayDeliveries(
       return;
     }
 
+    // orders é a fonte de verdade para todos os tipos (ML, Shopee, próprio)
+    // próprios são inseridos em orders ao criar o pedido com endereço completo
     const orFilters = cepZones.map(z => `delivery_cep.like.${z}%`).join(',');
 
     let query = supabase
       .from('orders')
       .select('id, platform, external_order_id, tracking_number, status, delivery_cep, raw_payload, created_at')
       .eq('status', 'shipped')
-      .neq('platform', 'proprio') // próprios vêm da query abaixo com endereço completo
       .not('delivery_cep', 'is', null);
     query = query.or(orFilters);
 
-    const orFiltersProprio = cepZones.map(z => `dest_cep.like.${z}%`).join(',');
-    let proprioQuery = supabase
-      .from('proprio_orders')
-      .select('id, tracking_number, status, recipient_name, recipient_phone, dest_cep, dest_street, dest_number, dest_complement, dest_city, dest_state, created_at')
-      .eq('status', 'shipped')
-      .not('dest_cep', 'is', null);
-    proprioQuery = proprioQuery.or(orFiltersProprio);
-
-    const [{ data, error }, { data: proprioData, error: proprioError }] = await Promise.all([
-      query.order('created_at', { ascending: true }).limit(200),
-      proprioQuery.order('created_at', { ascending: true }).limit(200),
-    ]);
+    const { data, error } = await query.order('created_at', { ascending: true }).limit(200);
 
     if (error) throw new AppError(500, error.message);
-    if (proprioError) throw new AppError(500, proprioError.message);
 
-    const mappedProprio = (proprioData ?? []).map(o => ({
-      id: o.id,
-      platform: 'proprio' as const,
-      external_order_id: o.tracking_number,
-      tracking_number: o.tracking_number,
-      status: o.status,
-      delivery_cep: o.dest_cep,
-      raw_payload: {
-        recipient_name: o.recipient_name,
-        recipient_phone: o.recipient_phone,
-        dest_street: o.dest_street,
-        dest_number: o.dest_number,
-        dest_complement: o.dest_complement,
-        dest_city: o.dest_city,
-        dest_state: o.dest_state,
-      },
-      created_at: o.created_at,
-    }));
-
-    const items = [...(data ?? []), ...mappedProprio].sort(
+    const items = (data ?? []).sort(
       (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
     );
 
