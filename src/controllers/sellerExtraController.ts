@@ -136,6 +136,24 @@ export async function cancelProprioHandler(
   try {
     const id = req.params['id'];
     if (!id || typeof id !== 'string') throw new AppError(400, 'id obrigatório');
+
+    const { reason } = req.body as { reason?: string };
+
+    // Verifica status atual
+    const { data: order } = await supabase
+      .from('proprio_orders')
+      .select('status')
+      .eq('id', id)
+      .eq('seller_id', req.sellerId!)
+      .maybeSingle();
+
+    if (!order) throw new AppError(404, 'Pedido não encontrado');
+
+    const requireReason = ['collected', 'shipped', 'delivered'];
+    if (requireReason.includes(order.status as string) && !reason?.trim()) {
+      throw new AppError(400, `Pedido já ${order.status === 'delivered' ? 'entregue' : 'coletado'}. Informe o motivo do cancelamento.`);
+    }
+
     await cancelProprioOrder(req.sellerId!, id);
     res.json({ success: true });
   } catch (err) { next(err); }
