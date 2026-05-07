@@ -16,6 +16,7 @@ import {
   getHubQrHtml,
   runRecurringCollections,
   getOrderDetailService,
+  getCollectionTimeline,
 } from '../services/sellerExtraService';
 import { AppError } from '../middlewares/errorHandler';
 import { supabase } from '../lib/supabase';
@@ -50,6 +51,17 @@ export async function collectionDetailHandler(
     const id = req.params['id'];
     if (!id || typeof id !== 'string') throw new AppError(400, 'id obrigatório');
     const data = await getCollectionDetail(req.sellerId!, id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function collectionTimelineHandler(
+  req: Request, res: Response, next: NextFunction,
+): Promise<void> {
+  try {
+    const id = req.params['id'];
+    if (!id || typeof id !== 'string') throw new AppError(400, 'id obrigatório');
+    const data = await getCollectionTimeline(req.sellerId!, id);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 }

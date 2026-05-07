@@ -15,6 +15,7 @@ import {
   readyToCollectHandler,
   quickCollectHandler,
   collectionDetailHandler,
+  collectionTimelineHandler,
   getRecurringHandler,
   upsertRecurringHandler,
   registerPushTokenHandler,
@@ -62,7 +63,8 @@ router.post('/coletas',          createColetaHandler);
 router.get('/coletas',           listColetasHandler);
 router.get('/coletas/ready',     readyToCollectHandler);
 router.post('/coletas/quick',    quickCollectHandler);
-router.get('/coletas/:id',       collectionDetailHandler);
+router.get('/coletas/:id',          collectionDetailHandler);
+router.get('/coletas/:id/timeline', collectionTimelineHandler);
 
 // Coleta automática (recorrente)
 router.get('/recurring',  getRecurringHandler);
