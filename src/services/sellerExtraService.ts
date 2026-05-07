@@ -758,9 +758,8 @@ export async function getCollectionTimeline(
     { type: 'accepted',  label: 'Coletor a caminho',    timestamp: col.accepted_at,   done: !!col.accepted_at  },
     { type: 'arrived',   label: 'Coletor no local',     timestamp: col.arrived_at,    done: !!col.arrived_at   },
     { type: 'collected', label: 'Pacotes coletados',    timestamp: col.collected_at,  done: !!col.collected_at },
-    { type: 'hub',      label: 'Chegou ao Hub Voltic', timestamp: hubScan?.scanned_at ?? null, done: !!hubScan },
-    { type: 'manifest', label: 'Manifesto de saída',   timestamp: manifest?.created_at ?? delivPickup?.scanned_at ?? null, done: !!(manifest || delivPickup) },
-    { type: 'pickup',   label: 'Saiu para entrega',    timestamp: delivPickup?.scanned_at ?? null, done: !!delivPickup },
+    { type: 'hub',    label: 'Chegou ao Hub Voltic', timestamp: hubScan?.scanned_at ?? null,    done: !!hubScan    },
+    { type: 'pickup', label: 'Saiu para entrega',    timestamp: delivPickup?.scanned_at ?? null, done: !!delivPickup },
     {
       type: 'delivered', label: 'Entregue',
       timestamp: proof?.delivered_at ?? null,
