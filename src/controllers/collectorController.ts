@@ -230,6 +230,7 @@ export async function todayDeliveries(
       .from('orders')
       .select('id, platform, external_order_id, tracking_number, status, delivery_cep, raw_payload, created_at')
       .eq('status', 'shipped')
+      .neq('platform', 'proprio') // próprios vêm da query abaixo com endereço completo
       .not('delivery_cep', 'is', null);
     query = query.or(orFilters);
 
