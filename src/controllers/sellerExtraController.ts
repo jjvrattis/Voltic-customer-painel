@@ -18,6 +18,7 @@ import {
   getOrderDetailService,
 } from '../services/sellerExtraService';
 import { AppError } from '../middlewares/errorHandler';
+import { supabase } from '../lib/supabase';
 
 // ─── Quick Collect ────────────────────────────────────────────────────────────
 
