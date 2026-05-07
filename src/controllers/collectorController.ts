@@ -313,6 +313,19 @@ export async function completeDelivery(
       .eq('id', id);
     if (oErr) throw new AppError(500, oErr.message);
 
+    // Sincroniza proprio_orders se for um pedido próprio
+    const { data: orderData } = await supabase
+      .from('orders')
+      .select('tracking_number, platform')
+      .eq('id', id)
+      .maybeSingle();
+    if (orderData?.platform === 'proprio' && orderData.tracking_number) {
+      await supabase
+        .from('proprio_orders')
+        .update({ status: 'delivered', delivered_at: now })
+        .eq('tracking_number', orderData.tracking_number);
+    }
+
     res.json({ success: true } satisfies ApiResponse);
   } catch (err) {
     next(err);
