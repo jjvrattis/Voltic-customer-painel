@@ -233,7 +233,7 @@ export async function todayDeliveries(
     let query = supabase
       .from('orders')
       .select('id, platform, external_order_id, tracking_number, status, delivery_cep, raw_payload, created_at')
-      .in('status', ['shipped', 'delivered'])
+      .in('status', ['shipped', 'delivered', 'occurrence'])
       .gte('created_at', cutoffHistory)
       .not('delivery_cep', 'is', null);
     query = query.or(orFilters);
@@ -485,6 +485,42 @@ export async function scanHistory(
     if (error) throw new AppError(500, error.message);
 
     res.json({ success: true, data: { items: data ?? [] } } satisfies ApiResponse);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ── Ocorrências de entrega ────────────────────────────────────────────────────
+
+export async function createOccurrence(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const collectorId = req.collectorId!;
+    const { id } = req.params;
+    const { reason, photo_url, notes } = req.body as {
+      reason?: string;
+      photo_url?: string;
+      notes?: string;
+    };
+
+    if (!reason) throw new AppError(400, 'reason obrigatório');
+    if (!photo_url) throw new AppError(400, 'photo_url obrigatório');
+
+    const { error: occErr } = await supabase
+      .from('delivery_occurrences')
+      .insert({ order_id: id, collector_id: collectorId, reason, photo_url, notes: notes ?? null });
+    if (occErr) throw new AppError(500, occErr.message);
+
+    const { error: oErr } = await supabase
+      .from('orders')
+      .update({ status: 'occurrence' as never })
+      .eq('id', id);
+    if (oErr) throw new AppError(500, oErr.message);
+
+    res.json({ success: true } satisfies ApiResponse);
   } catch (err) {
     next(err);
   }
