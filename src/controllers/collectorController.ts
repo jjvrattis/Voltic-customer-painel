@@ -202,6 +202,27 @@ export async function registerScan(
         if (scan_type === 'delivered') update['delivered_at']  = new Date().toISOString();
         await supabase.from('orders').update(update).eq('id', order.id);
       }
+    } else {
+      // VLTC próprio: tracking_number existe em proprio_orders, não em orders
+      const { data: proprio } = await supabase
+        .from('proprio_orders')
+        .select('id, status')
+        .eq('tracking_number', tracking_code)
+        .maybeSingle();
+
+      if (proprio) {
+        const newStatus =
+          scan_type === 'pickup'          ? 'collected' :
+          scan_type === 'delivery_pickup' ? 'shipped'   :
+          scan_type === 'delivered'       ? 'delivered' : null;
+
+        if (newStatus) {
+          const update: Record<string, unknown> = { status: newStatus };
+          if (scan_type === 'pickup')    update['collected_at']  = new Date().toISOString();
+          if (scan_type === 'delivered') update['delivered_at']  = new Date().toISOString();
+          await supabase.from('proprio_orders').update(update).eq('id', proprio.id);
+        }
+      }
     }
 
     res.json({ success: true, data: { scan, order_found: !!order } } satisfies ApiResponse);
