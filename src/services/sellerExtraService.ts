@@ -436,7 +436,11 @@ export async function getProprioLabelHtml(sellerId: string, orderId: string): Pr
   const trackingCode = (order as ProprioOrder & { tracking_number?: string }).tracking_number
     ?? `VLTC-${order.id.slice(0,8).toUpperCase()}`;
 
-  const qrSvg      = await QRCode.toString(trackingCode, { type: 'svg', width: 200, margin: 1 });
+  const qrSvg      = await QRCode.toString(trackingCode, {
+    type: 'svg', width: 300, margin: 3,
+    errorCorrectionLevel: 'M',
+    color: { dark: '#000000', light: '#ffffff' },
+  });
   const senderName = esc(profile?.name ?? 'Remetente');
   const senderAddr = profile
     ? esc(`${profile.street}, ${profile.street_number} — ${profile.neighborhood ?? ''} ${profile.city}/${profile.state}`)
@@ -453,8 +457,8 @@ export async function getProprioLabelHtml(sellerId: string, orderId: string): Pr
   }
   .top { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 6px; }
   .brand { font-weight: 900; font-size: 22px; letter-spacing: 4px; }
-  .qr { width: 28mm; height: 28mm; }
-  .qr svg { width: 100%; height: 100%; }
+  .qr { width: 38mm; height: 38mm; flex-shrink: 0; }
+  .qr svg { width: 100%; height: 100%; display: block; }
   .tracking { font-size: 13px; font-weight: 700; letter-spacing: 2px; text-align: center; border: 2px solid #000; padding: 3px 6px; margin-bottom: 6px; }
   .block { margin-bottom: 6px; }
   .lbl { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #555; }
