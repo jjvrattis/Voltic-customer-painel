@@ -228,10 +228,13 @@ export async function todayDeliveries(
     // próprios são inseridos em orders ao criar o pedido com endereço completo
     const orFilters = cepZones.map(z => `delivery_cep.like.${z}%`).join(',');
 
+    const cutoffHistory = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
     let query = supabase
       .from('orders')
       .select('id, platform, external_order_id, tracking_number, status, delivery_cep, raw_payload, created_at')
-      .eq('status', 'shipped')
+      .in('status', ['shipped', 'delivered'])
+      .gte('created_at', cutoffHistory)
       .not('delivery_cep', 'is', null);
     query = query.or(orFilters);
 
