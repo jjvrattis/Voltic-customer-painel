@@ -69,7 +69,7 @@ function makeMarkerContent(name: string, packages: number): HTMLElement {
 export default function LiveMap() {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef       = useRef<google.maps.Map | null>(null);
-  const markersRef   = useRef<Map<string, google.maps.marker.AdvancedMarkerElement>>(new Map());
+  const markersRef   = useRef<Map<string, google.maps.Marker>>(new Map());
   const [pins,        setPins]        = useState<Pin[]>([]);
   const [lastUpdate,  setLastUpdate]  = useState<string | null>(null);
   const [selected,    setSelected]    = useState<Pin | null>(null);
@@ -78,20 +78,19 @@ export default function LiveMap() {
   // Inicializa mapa
   useEffect(() => {
     const loader = new Loader({ apiKey: GMAPS_KEY, version: 'weekly', libraries: ['maps', 'marker'] });
-    loader.load().then(async () => {
+    // v2: usa load() + google.maps global
+    void (loader as any).load().then(() => {
       if (!containerRef.current) return;
-      const { Map } = await google.maps.importLibrary('maps') as google.maps.MapsLibrary;
-      const map = new Map(containerRef.current, {
+      const map = new google.maps.Map(containerRef.current, {
         center: { lat: -23.55, lng: -46.63 },
         zoom: 12,
         styles: DARK_STYLE,
         disableDefaultUI: true,
         zoomControl: true,
-        mapId: 'voltic-admin-map',
       });
       mapRef.current = map;
       setMapReady(true);
-    }).catch(console.error);
+    });
   }, []);
 
   // Polling 10s
@@ -107,44 +106,49 @@ export default function LiveMap() {
     return () => clearInterval(id);
   }, [poll]);
 
-  // Atualiza markers
+  // Atualiza markers (google.maps.Marker clássico — sem AdvancedMarkerElement)
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
+    const map = mapRef.current;
+    const seenIds = new Set<string>();
 
-    google.maps.importLibrary('marker').then(async () => {
-      const { AdvancedMarkerElement } = await google.maps.importLibrary('marker') as google.maps.MarkerLibrary;
-      const map = mapRef.current!;
-      const seenIds = new Set<string>();
+    for (const pin of pins) {
+      seenIds.add(pin.collector_id);
+      const pos = { lat: pin.lat, lng: pin.lng };
+      const initial = pin.name.charAt(0).toUpperCase();
 
-      for (const pin of pins) {
-        seenIds.add(pin.collector_id);
-        const pos = { lat: pin.lat, lng: pin.lng };
+      const icon: google.maps.Symbol = {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 16,
+        fillColor: '#9333EA',
+        fillOpacity: 1,
+        strokeColor: '#FFD700',
+        strokeWeight: 3,
+      };
 
-        const existing = markersRef.current.get(pin.collector_id);
-        if (existing) {
-          existing.position = pos;
-          existing.content  = makeMarkerContent(pin.name, pin.packages);
-        } else {
-          const marker = new AdvancedMarkerElement({
-            map, position: pos,
-            content: makeMarkerContent(pin.name, pin.packages),
-            title: pin.name,
-          });
-          marker.addListener('click', () => setSelected(pin));
-          markersRef.current.set(pin.collector_id, marker);
-        }
+      const existing = markersRef.current.get(pin.collector_id);
+      if (existing) {
+        existing.setPosition(pos);
+      } else {
+        const marker = new google.maps.Marker({
+          map, position: pos, icon,
+          label: { text: initial, color: '#fff', fontSize: '14px', fontWeight: '800' },
+          title: `${pin.name} · ${pin.packages} pacotes`,
+        });
+        marker.addListener('click', () => setSelected(pin));
+        markersRef.current.set(pin.collector_id, marker);
       }
+    }
 
-      markersRef.current.forEach((marker, id) => {
-        if (!seenIds.has(id)) { marker.map = null; markersRef.current.delete(id); }
-      });
+    markersRef.current.forEach((marker, id) => {
+      if (!seenIds.has(id)) { marker.setMap(null); markersRef.current.delete(id); }
+    });
 
-      if (pins.length > 0) {
-        const bounds = new google.maps.LatLngBounds();
-        pins.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }));
-        map.fitBounds(bounds, 80);
-      }
-    }).catch(console.error);
+    if (pins.length > 0) {
+      const bounds = new google.maps.LatLngBounds();
+      pins.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }));
+      map.fitBounds(bounds, 80);
+    }
   }, [pins, mapReady]);
 
   return (
