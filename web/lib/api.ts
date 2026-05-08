@@ -211,10 +211,12 @@ export interface AdminMetrics {
   collectors:{ total: number; active: number };
   orders_today: {
     total: number; ready_to_ship: number;
-    collected: number; shipped: number; delivered: number;
+    collected: number; shipped: number; delivered: number; occurrence: number;
   };
-  deliveries_today: number;
+  deliveries_today:      number;
+  occurrences_today:     number;
   pending_billing_cents: number;
+  revenue_month_cents:   number;
 }
 
 export interface AdminSeller {

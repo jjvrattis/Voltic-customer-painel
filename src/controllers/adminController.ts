@@ -73,8 +73,11 @@ export async function getAdminMetrics(
       { count: totalCollectors },
       { count: activeCollectors },
       ordersToday,
+      proprioToday,
       deliveriesToday,
+      occurrencesToday,
       pendingCharges,
+      revenueResult,
     ] = await Promise.all([
       supabase.from('seller_accounts').select('*', { count: 'exact', head: true }),
       supabase.from('collectors').select('*', { count: 'exact', head: true }),
@@ -85,26 +88,41 @@ export async function getAdminMetrics(
         .gte('created_at', `${today}T00:00:00`)
         .lte('created_at', `${today}T23:59:59`),
       supabase
+        .from('proprio_orders')
+        .select('status', { count: 'exact' })
+        .gte('created_at', `${today}T00:00:00`)
+        .lte('created_at', `${today}T23:59:59`),
+      supabase
         .from('deliveries')
         .select('*', { count: 'exact', head: true })
         .gte('delivered_at', `${today}T00:00:00`),
       supabase
+        .from('delivery_occurrences')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', `${today}T00:00:00`),
+      supabase
         .from('seller_charges')
         .select('amount_cents')
         .eq('status', 'pending'),
+      supabase
+        .from('seller_charges')
+        .select('amount_cents')
+        .eq('status', 'paid')
+        .gte('paid_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
     ]);
 
-    // Contagem por status hoje
     const statusCount: Record<string, number> = {};
     for (const row of (ordersToday.data ?? [])) {
       statusCount[row.status] = (statusCount[row.status] ?? 0) + 1;
     }
 
-    // Valor pendente total
-    const pendingTotal = (pendingCharges.data ?? []).reduce(
-      (acc, c) => acc + (c.amount_cents as number),
-      0,
-    );
+    const proprioStatusCount: Record<string, number> = {};
+    for (const row of (proprioToday.data ?? [])) {
+      proprioStatusCount[row.status as string] = (proprioStatusCount[row.status as string] ?? 0) + 1;
+    }
+
+    const pendingTotal = (pendingCharges.data ?? []).reduce((acc, c) => acc + (c.amount_cents as number), 0);
+    const revenueTotal = (revenueResult.data ?? []).reduce((acc, c) => acc + (c.amount_cents as number), 0);
 
     res.json({
       success: true,
@@ -112,14 +130,17 @@ export async function getAdminMetrics(
         sellers:   { total: totalSellers ?? 0 },
         collectors:{ total: totalCollectors ?? 0, active: activeCollectors ?? 0 },
         orders_today: {
-          total:        (ordersToday.count ?? 0),
-          ready_to_ship: statusCount['ready_to_ship'] ?? 0,
-          collected:     statusCount['collected']      ?? 0,
-          shipped:       statusCount['shipped']        ?? 0,
-          delivered:     statusCount['delivered']      ?? 0,
+          total:         (ordersToday.count ?? 0) + (proprioToday.count ?? 0),
+          ready_to_ship: (statusCount['ready_to_ship'] ?? 0) + (proprioStatusCount['ready_to_ship'] ?? 0),
+          collected:     (statusCount['collected']      ?? 0) + (proprioStatusCount['collected'] ?? 0),
+          shipped:       (statusCount['shipped']        ?? 0) + (proprioStatusCount['shipped'] ?? 0),
+          delivered:     (statusCount['delivered']      ?? 0) + (proprioStatusCount['delivered'] ?? 0),
+          occurrence:    (statusCount['occurrence']     ?? 0) + (proprioStatusCount['occurrence'] ?? 0),
         },
-        deliveries_today: deliveriesToday.count ?? 0,
+        deliveries_today:      deliveriesToday.count ?? 0,
+        occurrences_today:     occurrencesToday.count ?? 0,
         pending_billing_cents: pendingTotal,
+        revenue_month_cents:   revenueTotal,
       },
     } satisfies ApiResponse);
   } catch (err) {
