@@ -14,8 +14,8 @@ export async function getLiveMap(
   try {
     const { data: locations, error } = await supabase
       .from('collector_locations')
-      .select('collector_id, lat, lng, heading, speed, is_active, updated_at')
-      .eq('is_active', true)
+      .select('collector_id, lat, lng, heading, speed, updated_at')
+      .gte('updated_at', new Date(Date.now() - 5 * 60 * 1000).toISOString())
       .gte('updated_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()); // últimos 5min
 
     if (error) throw new AppError(500, error.message);
