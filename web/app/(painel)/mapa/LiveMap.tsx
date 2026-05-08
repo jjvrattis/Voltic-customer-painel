@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Loader } from '@googlemaps/js-api-loader';
+import { setOptions, importLibrary } from '@googlemaps/js-api-loader';
 import { getAdminToken } from '@/lib/api';
 
 interface Pin {
@@ -77,11 +77,11 @@ export default function LiveMap() {
 
   // Inicializa mapa
   useEffect(() => {
-    const loader = new Loader({ apiKey: GMAPS_KEY, version: 'weekly', libraries: ['maps', 'marker'] });
-    // v2: usa load() + google.maps global
-    void (loader as any).load().then(() => {
+    setOptions({ key: GMAPS_KEY, v: 'weekly' });
+    void importLibrary('maps').then((lib) => {
       if (!containerRef.current) return;
-      const map = new google.maps.Map(containerRef.current, {
+      const GMap = (lib as google.maps.MapsLibrary).Map;
+      const map = new GMap(containerRef.current, {
         center: { lat: -23.55, lng: -46.63 },
         zoom: 12,
         styles: DARK_STYLE,
@@ -106,7 +106,7 @@ export default function LiveMap() {
     return () => clearInterval(id);
   }, [poll]);
 
-  // Atualiza markers (google.maps.Marker clássico — sem AdvancedMarkerElement)
+  // Atualiza markers
   useEffect(() => {
     if (!mapReady || !mapRef.current) return;
     const map = mapRef.current;
