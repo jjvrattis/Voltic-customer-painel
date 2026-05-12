@@ -168,11 +168,17 @@ export async function registerScan(
       throw new AppError(400, `scan_type deve ser um de: ${allowed.join(', ')}`);
     }
 
+    // Busca por tracking_number, external_order_id ou id direto
     const { data: order } = await supabase
       .from('orders')
       .select('id, status')
-      .eq('tracking_number', tracking_code)
+      .or(`tracking_number.eq.${tracking_code},external_order_id.eq.${tracking_code},id.eq.${tracking_code}`)
       .maybeSingle();
+
+    // Bloqueia re-scan de pedidos já finalizados antes de inserir o scan
+    if (order && scan_type === 'delivery_pickup' && ['delivered', 'occurrence'].includes(order.status as string)) {
+      throw new AppError(400, 'Este pedido já foi entregue ou tem ocorrência registrada');
+    }
 
     const { data: scan, error } = await supabase
       .from('scans')
@@ -190,10 +196,6 @@ export async function registerScan(
     if (error) throw new AppError(500, error.message);
 
     if (order) {
-      // Bloqueia re-scan de pedidos já finalizados na fase de entrega
-      if (scan_type === 'delivery_pickup' && ['delivered', 'occurrence'].includes(order.status as string)) {
-        throw new AppError(400, 'Este pedido já foi entregue ou tem ocorrência registrada');
-      }
 
       const newStatus =
         scan_type === 'pickup'           ? 'collected' :
@@ -238,27 +240,42 @@ export async function todayDeliveries(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const cepZones = req.collectorCepZones ?? [];
-    if (cepZones.length === 0) {
+    const collectorId = req.collectorId!;
+    const cepZones    = req.collectorCepZones ?? [];
+    const cutoffHistory = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    // IDs de pedidos que este coletor bipou hoje (delivery_pickup)
+    const { data: todayScans } = await supabase
+      .from('scans')
+      .select('order_id')
+      .eq('collector_id', collectorId)
+      .eq('scan_type', 'delivery_pickup')
+      .gte('scanned_at', cutoffHistory)
+      .not('order_id', 'is', null);
+
+    const scannedIds = (todayScans ?? [])
+      .map(s => (s as { order_id: string }).order_id)
+      .filter(Boolean);
+
+    // Monta filtros: CEP zones + orders diretamente bipados pelo coletor
+    const orParts: string[] = [
+      ...cepZones.map(z => `delivery_cep.like.${z}%`),
+      ...scannedIds.map(id => `id.eq.${id}`),
+    ];
+
+    if (orParts.length === 0) {
       res.json({ success: true, data: { items: [] } } satisfies ApiResponse);
       return;
     }
 
-    // orders é a fonte de verdade para todos os tipos (ML, Shopee, próprio)
-    // próprios são inseridos em orders ao criar o pedido com endereço completo
-    const orFilters = cepZones.map(z => `delivery_cep.like.${z}%`).join(',');
-
-    const cutoffHistory = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-
-    let query = supabase
+    const { data, error } = await supabase
       .from('orders')
       .select('id, platform, external_order_id, tracking_number, status, delivery_cep, raw_payload, created_at')
       .in('status', ['shipped', 'delivered', 'occurrence'])
       .gte('created_at', cutoffHistory)
-      .not('delivery_cep', 'is', null);
-    query = query.or(orFilters);
-
-    const { data, error } = await query.order('created_at', { ascending: true }).limit(200);
+      .or(orParts.join(','))
+      .order('created_at', { ascending: true })
+      .limit(200);
 
     if (error) throw new AppError(500, error.message);
 
