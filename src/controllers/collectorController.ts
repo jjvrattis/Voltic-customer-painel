@@ -168,11 +168,16 @@ export async function registerScan(
       throw new AppError(400, `scan_type deve ser um de: ${allowed.join(', ')}`);
     }
 
-    // Busca por tracking_number, external_order_id ou id direto
+    // Busca por tracking_number ou external_order_id
+    // id.eq só se for UUID válido (caso o app envie o order_id direto)
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tracking_code);
+    const orFilter = `tracking_number.eq.${tracking_code},external_order_id.eq.${tracking_code}`
+      + (isUuid ? `,id.eq.${tracking_code}` : '');
+
     const { data: order } = await supabase
       .from('orders')
       .select('id, status')
-      .or(`tracking_number.eq.${tracking_code},external_order_id.eq.${tracking_code},id.eq.${tracking_code}`)
+      .or(orFilter)
       .maybeSingle();
 
     // Bloqueia re-scan de pedidos já finalizados antes de inserir o scan
