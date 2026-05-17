@@ -16,7 +16,7 @@ interface Pin {
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
-const GMAPS_KEY = '***REMOVED***';
+const GMAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY ?? '';
 
 const DARK_STYLE: google.maps.MapTypeStyle[] = [
   { elementType: 'geometry',           stylers: [{ color: '#0e0b1e' }] },
