@@ -19,4 +19,4 @@ jobs:
             git pull origin master
             npm install --omit=dev
             npm run build
-            pm2 restart voltic-api || pm2 start dist/server.js --name voltic-api
+            pm2 restart voltic-painel || pm2 start dist/server.js -i max --name voltic-painel
