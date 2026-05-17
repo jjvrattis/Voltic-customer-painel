@@ -1,11 +1,16 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import { requestLogger } from './middlewares/requestLogger';
 import { errorHandler } from './middlewares/errorHandler';
 import apiRouter from './routes/index';
 
 const app = express();
+
+// Security headers
+app.use(helmet());
+app.disable('x-powered-by');
 
 const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? '')
   .split(',')
