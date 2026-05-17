@@ -1,11 +1,12 @@
 import Link from 'next/link';
 
-export default function SucessoPage({
+export default async function SucessoPage({
   searchParams,
 }: {
-  searchParams: { platform?: string };
+  searchParams: Promise<{ platform?: string }>;
 }) {
-  const platform = searchParams.platform ?? 'plataforma';
+  const { platform: _platform } = await searchParams;
+  const platform = _platform ?? 'plataforma';
   const label = platform === 'ml' ? 'Mercado Livre' : platform === 'shopee' ? 'Shopee' : platform;
 
   return (
