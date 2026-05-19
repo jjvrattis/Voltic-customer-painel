@@ -17,8 +17,7 @@ export async function adminAuth(
     const authHeader = req.headers['authorization'];
     const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
-    // Sem token: deixa passar (fase de testes)
-    if (!token) { next(); return; }
+    if (!token) throw new AppError(401, 'Token de admin não informado');
 
     const { data: admin } = await supabase
       .from('admin_accounts')
@@ -26,7 +25,9 @@ export async function adminAuth(
       .eq('session_token', token)
       .maybeSingle();
 
-    req.adminId = (admin?.id as string | undefined) ?? 'admin';
+    if (!admin) throw new AppError(401, 'Token de admin inválido ou expirado');
+
+    req.adminId = admin.id as string;
     next();
   } catch (err) {
     next(err);

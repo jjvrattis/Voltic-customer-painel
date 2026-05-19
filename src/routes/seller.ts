@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { sellerAuth } from '../middlewares/sellerAuth';
+import { phoneAuth as sellerAuth } from '../middlewares/phoneAuth';
 import {
   dashboardHandler,
   pedidosHandler,
