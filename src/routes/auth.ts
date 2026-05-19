@@ -17,6 +17,7 @@ import { adminAuth } from '../middlewares/adminAuth';
 import {
   sendCodeHandler,
   verifySellerHandler,
+  registerSellerHandler,
   normalizePhoneHandler,
 } from '../controllers/phoneAuthController';
 
@@ -76,6 +77,7 @@ const otpVerifyLimiter = rateLimit({
 
 router.post('/phone/send-code',     otpSendLimiter,   sendCodeHandler);
 router.post('/phone/verify-seller', otpVerifyLimiter, verifySellerHandler);
+router.post('/phone/register',      otpVerifyLimiter, registerSellerHandler);
 router.get('/phone/normalize',                        normalizePhoneHandler);
 
 export default router;

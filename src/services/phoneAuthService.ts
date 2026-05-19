@@ -162,6 +162,75 @@ export async function resolvePhoneSession(token: string): Promise<PhoneSessionIn
   return { accountType: data.account_type as string, accountId: data.account_id as string };
 }
 
+// ─── Registro de novo seller via telefone ────────────────────────────────────
+
+export interface SellerRegisterResult {
+  sessionToken: string;
+  sellerId:     string;
+  isNew:        boolean;
+}
+
+export async function phoneRegisterSeller(
+  phone: string,
+  code:  string,
+  deviceInfo?: Record<string, unknown>,
+): Promise<SellerRegisterResult> {
+  const normalized = await verifyCode(phone, code);
+
+  // Se já tem conta, faz login normal em vez de criar duplicata
+  const { data: existing } = await supabase
+    .from('seller_accounts')
+    .select('id, seller_id, phone_verified_at')
+    .eq('phone', normalized)
+    .maybeSingle();
+
+  if (existing) {
+    if (!existing.phone_verified_at) {
+      await supabase
+        .from('seller_accounts')
+        .update({ phone_verified_at: new Date().toISOString(), legacy_email_login: false })
+        .eq('id', existing.id);
+    }
+    const sessionToken = await createPhoneSession({
+      accountType: 'seller',
+      accountId:   existing.id as string,
+      deviceInfo,
+    });
+    return { sessionToken, sellerId: existing.seller_id as string, isNew: false };
+  }
+
+  // Cria nova conta phone-only
+  const internalId = crypto.randomUUID();
+  const { data: newAccount, error } = await supabase
+    .from('seller_accounts')
+    .insert({
+      seller_id:          internalId,
+      phone:              normalized,
+      phone_verified_at:  new Date().toISOString(),
+      legacy_email_login: false,
+    })
+    .select('id, seller_id')
+    .single();
+
+  if (error || !newAccount) throw new AppError(500, `Erro ao criar conta: ${error?.message}`);
+
+  // Cria crédito inicial zerado
+  await supabase.from('seller_credits').insert({
+    seller_id:    internalId,
+    credit_limit: 0,
+    used_credits: 0,
+  });
+
+  const sessionToken = await createPhoneSession({
+    accountType: 'seller',
+    accountId:   newAccount.id as string,
+    deviceInfo,
+  });
+
+  logger.info({ phone: normalized, sellerId: internalId }, 'Novo seller criado via OTP');
+  return { sessionToken, sellerId: internalId, isNew: true };
+}
+
 // ─── Fluxo completo: verificar + logar seller ─────────────────────────────────
 
 export interface SellerLoginResult {

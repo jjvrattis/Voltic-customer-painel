@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import {
   sendVerificationCode,
   phoneLoginSeller,
+  phoneRegisterSeller,
   normalizePhone,
 } from '../services/phoneAuthService';
 
@@ -50,6 +51,38 @@ export async function verifySellerHandler(
         token:      result.sessionToken,
         seller_id:  result.sellerId,
         name:       result.sellerName,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function registerSellerHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { phone, code, device_info } = req.body as {
+      phone?:       string;
+      code?:        string;
+      device_info?: Record<string, unknown>;
+    };
+
+    if (!phone || !code) {
+      res.status(400).json({ success: false, error: 'phone e code são obrigatórios' });
+      return;
+    }
+
+    const result = await phoneRegisterSeller(phone, code, device_info);
+
+    res.status(result.isNew ? 201 : 200).json({
+      success: true,
+      data: {
+        token:     result.sessionToken,
+        seller_id: result.sellerId,
+        is_new:    result.isNew,
       },
     });
   } catch (err) {
